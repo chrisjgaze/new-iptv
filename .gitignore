@@ -1,0 +1,18 @@
+node_modules/
+.DS_Store
+dist/
+src/api/key.ts
+pnpm-workspace.yaml
+# This project uses `pnpm` for package management
+package-lock.json
+# These are part of the build
+tizen/index.html
+tizen/assets
+tizen/fonts
+tizen/Debug
+tizen/obj
+tizen/Build
+lg/assets
+lg/fonts
+lg/*.ipk
+lg/index.html
