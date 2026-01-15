@@ -119,14 +119,12 @@ const Player = () => {
     init(parent);
     load({
       streamUrl:
-        "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8"
+        "http://vpn.tsclean.cc/movie/6c82e7398a/a2bfaf950817/1984030.mkv"
     });
     play();
   });
 
-  return <View autofocus onBack={() => navigate(-1)}>
-
-  </View>;
+  return <View autofocus onBack={() => navigate(-1)}></View>;
 };
 
 export default Player;

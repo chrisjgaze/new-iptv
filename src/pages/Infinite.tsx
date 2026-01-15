@@ -90,11 +90,8 @@ const Loops = (props) => {
         y={80}
         zIndex={105}
       >
-        <Text x={80} fontSize={28} color={0xf6f6f699}>
-          Built With:
-        </Text>
-        <View y={32} src="./assets/solidWord.png" width={280} height={52} />
-        <View x={0} y={110} src="./assets/tmdb.png" width={80} height={41} />
+        <Text x={80} fontSize={28} color={0xf6f6f699}></Text>
+
         <Text
           x={90}
           y={110}
@@ -102,10 +99,7 @@ const Loops = (props) => {
           width={160}
           fontSize={12}
           color={0xf6f6f699}
-        >
-          This product uses the TMDB API but is not endorsed or certified by
-          TMDB.
-        </Text>
+        ></Text>
       </View>
 
       <View x={160} y={300} height={300}>

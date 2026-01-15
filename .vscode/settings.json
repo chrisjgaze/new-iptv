@@ -1,11 +1,11 @@
 {
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.codeActionsOnSave": [
-    "source.formatDocument",
-    "source.fixAll.eslint"
-  ],
+  "editor.codeActionsOnSave": ["source.formatDocument", "source.fixAll.eslint"],
   "[typescript]": {
     "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
   },
+  "[xml]": {
+    "editor.defaultFormatter": "redhat.vscode-xml"
+  }
 }

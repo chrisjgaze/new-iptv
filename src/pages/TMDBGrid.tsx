@@ -84,10 +84,7 @@ const TMDB = (props) => {
           width={160}
           fontSize={12}
           color={0xf6f6f699}
-        >
-          This product uses the TMDB API but is not endorsed or certified by
-          TMDB.
-        </Text>
+        ></Text>
       </View>
 
       <ContentBlock

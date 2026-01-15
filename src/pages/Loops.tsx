@@ -52,9 +52,7 @@ const Loops = (props) => {
         <Text x={80} fontSize={28} color={0xf6f6f699}>
           Built With:
         </Text>
-        <View y={32} src="./assets/solidWord.png" width={280} height={52} />
 
-        <View x={0} y={110} src="./assets/tmdb.png" width={80} height={41} />
         <Text
           x={90}
           y={110}
@@ -62,10 +60,7 @@ const Loops = (props) => {
           width={160}
           fontSize={12}
           color={0xf6f6f699}
-        >
-          This product uses the TMDB API but is not endorsed or certified by
-          TMDB.
-        </Text>
+        ></Text>
       </View>
       <Column autofocus={activeRow()?.items()} y={240} onKeyPress={switchRow}>
         <View x={160} height={300} forwardFocus={1} marginTop={30}>
@@ -86,7 +81,9 @@ const Loops = (props) => {
           <Row gap={20} y={40} display="block">
             {activeRow()
               ?.items()
-              ?.map((item, index) => <Poster x={index * 210} {...item} />)}
+              ?.map((item, index) => (
+                <Poster x={index * 210} {...item} />
+              ))}
           </Row>
         </View>
 
