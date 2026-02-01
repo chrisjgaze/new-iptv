@@ -22,7 +22,7 @@ Get an api key from [TMDB API](https://developers.themoviedb.org/3/getting-start
 and put the key in `src/api/key.js` with `export default 'KEY_VALUE'`
 
 ```
-git clone https://github.com/lightning-tv/solid-demo-app
+git clone git@github.com:chrisjgaze/new-iptv.git
 cd solid-demo-app
 pnpm i
 pnpm start
