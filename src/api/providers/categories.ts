@@ -18,9 +18,6 @@ function normalizeCategories(payload: unknown): RawCategory[] {
 }
 
 function toTiles(items: RawCategory[]): Tile[] {
-  const basePosterSize =
-    new URLSearchParams(window.location.search).get("posterSize") || "w185";
-  const fallbackSrc = `https://image.tmdb.org/t/p/${basePosterSize}/q2lTO2j4Nzn3zLab0xMHeBya5sw.jpg`;
   return items
     .map((item, index) => {
       const title =
@@ -30,10 +27,10 @@ function toTiles(items: RawCategory[]): Tile[] {
         `Category ${index + 1}`;
       const id = item.category_id ?? index + 1;
       return {
-        src: fallbackSrc,
-        tileSrc: fallbackSrc,
+        src: "./assets/fallback.png",
+        tileSrc: "./assets/fallback.png",
         backdrop: 0x0b0b0fff,
-        href: "/categories",
+        href: `/categories/${id}`,
         shortTitle: title,
         title,
         overview: "",

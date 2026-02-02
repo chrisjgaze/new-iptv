@@ -70,7 +70,8 @@ export default function NavDrawer(props) {
     let index = 0;
     if (useMatch(() => "/browse/movie")()) index = 1;
     if (useMatch(() => "/browse/tv")()) index = 2;
-    if (useMatch(() => "/categories")()) index = 3;
+    if (useMatch(() => "/categories")() || useMatch(() => "/categories/:id")())
+      index = 3;
     if (useMatch(() => "/examples")()) index = 4;
     return base + step * index;
   });

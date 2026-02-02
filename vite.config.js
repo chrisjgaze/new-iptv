@@ -83,6 +83,14 @@ export default defineConfig(({ mode }) => ({
         target: "http://172.20.3.54:8000",
         changeOrigin: true
       },
+      "/categories": {
+        target: "http://172.20.3.54:8000",
+        changeOrigin: true
+      },
+      "/get_plot": {
+        target: "http://172.20.3.54:8000",
+        changeOrigin: true
+      },
       "/tmdb-image": {
         target: "https://image.tmdb.org/t/p",
         changeOrigin: true,

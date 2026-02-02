@@ -178,7 +178,9 @@ const Categories = () => {
     <Show when={isActive()} keyed>
       <View ref={root} style={pageStyles}>
         <Text style={headerStyles}>Categories</Text>
-        <Text style={subHeaderStyles}>Browse all available movie categories</Text>
+        <Text style={subHeaderStyles}>
+          Browse all available movie categories
+        </Text>
 
         {loading() ? (
           <Text style={statusTextStyles}>Loading categories...</Text>

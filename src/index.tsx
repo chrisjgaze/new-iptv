@@ -31,6 +31,7 @@ import NotFound from "./pages/NotFound";
 import fonts from "./fonts";
 import { browsePreload } from "./api/browsePreload";
 import { categoriesPreload } from "./api/categoriesPreload";
+import { categoryMoviesPreload } from "./api/categoryMoviesPreload";
 import { entityPreload } from "./api/entityPreload";
 import LeftNavWrapper from "./pages/LeftNavWrapper";
 import theme from "theme";
@@ -160,6 +161,12 @@ render(() => {
             path="categories"
             component={Browse}
             preload={categoriesPreload}
+          />
+          <KeepAliveRoute
+            id="category-movies"
+            path="categories/:id"
+            component={Browse}
+            preload={categoryMoviesPreload}
           />
           <Route path="loops" component={Loops} preload={tmdbData} />
           <Route path="infinite" component={Infinite} preload={tmdbData} />

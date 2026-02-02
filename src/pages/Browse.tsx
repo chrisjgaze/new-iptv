@@ -11,7 +11,7 @@ import {
   assertTruthy
 } from "@lightningtv/solid";
 import { Column, VirtualGrid, Image } from "@lightningtv/solid/primitives";
-import { useNavigate, usePreloadRoute, useMatch } from "@solidjs/router";
+import { useNavigate, usePreloadRoute, useMatch, useLocation } from "@solidjs/router";
 import { Thumbnail, TileRow } from "../components";
 import { Text, hexColor } from "@lightningtv/solid";
 import styles from "../styles";
@@ -26,7 +26,64 @@ const Browse = (props) => {
   const navigate = useNavigate();
   let firstRun = true;
   let vgRef;
-  const isCategories = useMatch(() => "/categories");
+  const location = useLocation();
+  const isCategoriesList = () => location.pathname === "/categories";
+  const isCategoryMovies = useMatch(() => "/categories/:id");
+  const isCategoryRoute = useMatch(() => "/categories/*all");
+  const plotBase = import.meta.env.VITE_PLOT_URL || "/get_plot";
+  const plotDebug = (() => {
+    const search = new URLSearchParams(window.location.search);
+    if (search.get("plotDebug") === "true") return true;
+    const hash = window.location.hash || "";
+    return hash.includes("plotDebug=true");
+  })();
+  const [debugLine, setDebugLine] = createSignal("");
+  const [debugPlotUrl, setDebugPlotUrl] = createSignal("");
+  const [debugCount, setDebugCount] = createSignal(0);
+  const plotCache = new Map<string, string>();
+  const plotInFlight = new Map<string, Promise<string>>();
+  let plotToken = 0;
+
+  function fetchPlot(tmdbId: string): Promise<string> {
+    if (plotCache.has(tmdbId)) {
+      return Promise.resolve(plotCache.get(tmdbId) || "");
+    }
+    if (plotInFlight.has(tmdbId)) {
+      return plotInFlight.get(tmdbId)!;
+    }
+    const request = fetch(`${plotBase}/${tmdbId}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load plot (${response.status})`);
+        }
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const data = await response.json();
+          return (
+            data?.plot ||
+            data?.overview ||
+            data?.description ||
+            data?.data?.plot ||
+            ""
+          );
+        }
+        return response.text();
+      })
+      .then((text) => {
+        plotCache.set(tmdbId, text);
+        plotInFlight.delete(tmdbId);
+        return text;
+      })
+      .catch((err) => {
+        if (plotDebug) {
+          console.log("plot error", err);
+        }
+        plotInFlight.delete(tmdbId);
+        return "";
+      });
+    plotInFlight.set(tmdbId, request);
+    return request;
+  }
 
   onCleanup(() => {
     console.log('cleanup');
@@ -46,9 +103,19 @@ const Browse = (props) => {
   );
 
   function updateContentBlock(_index, _col, elm) {
-    if (!elm) return;
+    if (!elm) {
+      if (plotDebug) setDebugLine("updateContentBlock: no element");
+      return;
+    }
 
     const item = elm.item || ({} as any);
+    if (plotDebug) {
+      setDebugCount((c) => c + 1);
+      setDebugLine(
+        `route=${window.location.hash} title=${item.title || ""} tmdb=${item.tmdb || item.item?.tmdb || ""}`
+      );
+      console.log("selection", { item, hasItem: !!elm.item });
+    }
 
     if (firstRun) {
       // no content set yet, set right away
@@ -56,9 +123,42 @@ const Browse = (props) => {
         setGlobalBackground(item.backdrop);
       }
 
-      if (item.heroContent) {
+      if (item.item?.stream_id && item.title && (item.tmdb || item.item?.tmdb)) {
+        const tmdbId = item.tmdb || item.item?.tmdb;
+        const ratingValue = Number(item.item?.rating ?? item.rating);
+        const hasRating = Number.isFinite(ratingValue);
+        const token = ++plotToken;
+        const url = `${plotBase}/${tmdbId}`;
+        if (plotDebug) {
+          console.log("plot request", { tmdbId, title: item.title, url });
+          setDebugLine(
+            `plot=${url} title=${item.title || ""} tmdb=${tmdbId || ""}`
+          );
+          setDebugPlotUrl(url);
+        }
+        setHeroContent({
+          title: item.title,
+          description: "Plot placeholder...",
+          metaText: hasRating ? `Rating ${ratingValue}` : "",
+          voteAverage: hasRating ? ratingValue : undefined,
+          voteCount: hasRating ? 1 : undefined
+        });
+        fetchPlot(String(tmdbId)).then((plot) => {
+          if (token !== plotToken || !plot) return;
+          if (plotDebug) {
+            console.log("plot response", { tmdbId, length: plot.length });
+          }
+          setHeroContent({
+            title: item.title,
+            description: plot,
+            metaText: hasRating ? `Rating ${ratingValue}` : "",
+            voteAverage: hasRating ? ratingValue : undefined,
+            voteCount: hasRating ? 1 : undefined
+          });
+        });
+      } else if (item.heroContent) {
         setHeroContent(item.heroContent);
-      } else if (isCategories() && item.title) {
+      } else if (isCategoriesList() && item.title) {
         setHeroContent({ title: item.title, description: "Category" });
       }
 
@@ -77,10 +177,48 @@ const Browse = (props) => {
       delayedBackgrounds(item.backdrop);
     }
 
+    if (item.item?.stream_id && item.title && (item.tmdb || item.item?.tmdb)) {
+      const tmdbId = item.tmdb || item.item?.tmdb;
+      const ratingValue = Number(item.item?.rating ?? item.rating);
+      const hasRating = Number.isFinite(ratingValue);
+      const token = ++plotToken;
+      const url = `${plotBase}/${tmdbId}`;
+      if (plotDebug) {
+        console.log("plot request", { tmdbId, title: item.title, url });
+        setDebugLine(
+          `plot=${url} title=${item.title || ""} tmdb=${tmdbId || ""}`
+        );
+        setDebugPlotUrl(url);
+      }
+      setHeroContent({
+        title: item.title,
+        description: "Plot placeholder...",
+        metaText: hasRating ? `Rating ${ratingValue}` : "",
+        voteAverage: hasRating ? ratingValue : undefined,
+        voteCount: hasRating ? 1 : undefined
+      });
+      fetchPlot(String(tmdbId)).then((plot) => {
+        if (token !== plotToken || !plot) return;
+        if (plotDebug) {
+          console.log("plot response", { tmdbId, length: plot.length });
+        }
+        setHeroContent({
+          title: item.title,
+          description: plot,
+          metaText: hasRating ? `Rating ${ratingValue}` : "",
+          voteAverage: hasRating ? ratingValue : undefined,
+          voteCount: hasRating ? 1 : undefined
+        });
+      });
+      return;
+    }
     if (item.heroContent) {
       delayedHero(item.heroContent);
-    } else if (isCategories() && item.title) {
+      return;
+    }
+    if (isCategoriesList() && item.title) {
       delayedHero({ title: item.title, description: "Category" });
+      return;
     }
   }
 
@@ -93,7 +231,7 @@ const Browse = (props) => {
     let entity = this.children.find((c) =>
       c.states!.has("focus")
     ) as ElementNode;
-    if (!entity?.item?.href || isCategories()) {
+    if (!entity?.item?.href || isCategoryMovies()) {
       return true;
     }
     navigate(entity.item.href);
@@ -103,6 +241,30 @@ const Browse = (props) => {
   return (
     <Show when={provider().pages().length}>
       <ContentBlock y={360} x={162} content={heroContent()} forwardFocus={() => vgRef.setFocus()} />
+      {plotDebug && (
+        <>
+          <Text
+            x={162}
+            y={320}
+            width={1400}
+            contain="width"
+            fontSize={18}
+            color={hexColor("ffcc00")}
+          >
+            {`sel=${debugCount()} ${debugLine()}`}
+          </Text>
+          <Text
+            x={162}
+            y={340}
+            width={1400}
+            contain="width"
+            fontSize={18}
+            color={hexColor("ffcc00")}
+          >
+            {debugPlotUrl()}
+          </Text>
+        </>
+      )}
       <View clipping style={styles.itemsContainer}>
         <VirtualGrid
           y={24}
@@ -113,9 +275,11 @@ const Browse = (props) => {
           announce={
             props.params?.filter
               ? `All Trending ${props.params.filter}`
-              : isCategories()
+              : isCategoriesList()
                 ? "Categories"
-                : "Browse"
+                : isCategoryMovies()
+                  ? "Category Movies"
+                  : "Browse"
           }
           onEnter={onEnter}
           columns={7}
@@ -130,7 +294,7 @@ const Browse = (props) => {
           each={provider().pages()}>
           {(item) => {
             const current = item();
-            if (isCategories()) {
+            if (isCategoriesList()) {
               return (
                 <View
                   style={styles.Thumbnail}
