@@ -71,8 +71,26 @@ const Entity = (props) => {
     setBackdropAlpha(0);
   }
 
+  function getQueryParam(key: string) {
+    const search = window.location.search || "";
+    if (search.includes(key)) {
+      return new URLSearchParams(search).get(key);
+    }
+    const hash = window.location.hash || "";
+    const queryIndex = hash.indexOf("?");
+    if (queryIndex === -1) return null;
+    const hashQuery = hash.slice(queryIndex + 1);
+    return new URLSearchParams(hashQuery).get(key);
+  }
+
   function onEnterTrailer() {
-    navigate("/player/123");
+    const streamId = getQueryParam("stream_id");
+    const ext = getQueryParam("ext") || "mkv";
+    if (streamId) {
+      navigate(`/player/${streamId}?ext=${ext}`);
+      return;
+    }
+    // fallback: no stream available
   }
 
   let columnRef, backdropRef, entityActions;

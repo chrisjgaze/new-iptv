@@ -231,7 +231,7 @@ const Browse = (props) => {
     let entity = this.children.find((c) =>
       c.states!.has("focus")
     ) as ElementNode;
-    if (!entity?.item?.href || isCategoryMovies()) {
+    if (!entity?.item?.href) {
       return true;
     }
     navigate(entity.item.href);

@@ -9,10 +9,17 @@ import { onMount } from "solid-js";
 import { setGlobalBackground } from "../state";
 import { init, load, play } from "../video";
 import { useNavigate } from "@solidjs/router";
+import { useParams } from "@solidjs/router";
 
 const Player = () => {
   let parent;
   const navigate = useNavigate();
+  const params = useParams();
+  const streamBase = import.meta.env.VITE_STREAM_BASE_URL || "http://YOUR_BASE_URL";
+  const streamUser = import.meta.env.VITE_STREAM_USERNAME || "YOUR_USERNAME";
+  const streamPass = import.meta.env.VITE_STREAM_PASSWORD || "YOUR_PASSWORD";
+  const urlParams = new URLSearchParams(window.location.search);
+  const ext = urlParams.get("ext") || "mkv";
   const OverviewContainer = {
     width: 900,
     height: 500,
@@ -117,10 +124,9 @@ const Player = () => {
     setGlobalBackground("#000000");
     parent = document.querySelector('[data-testid="player"]') as HTMLElement;
     init(parent);
-    load({
-      streamUrl:
-        "http://vpn.tsclean.cc/movie/6c82e7398a/a2bfaf950817/1984030.mkv"
-    });
+    const streamId = params.id;
+    const streamUrl = `${streamBase}/movie/${streamUser}/${streamPass}/${streamId}.${ext}`;
+    load({ streamUrl });
     play();
   });
 

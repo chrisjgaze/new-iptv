@@ -7,7 +7,12 @@ import path from "path";
 
 export default defineConfig(({ mode }) => ({
   define: {
-    __DEV__: mode !== "production"
+    __DEV__: mode !== "production",
+    "import.meta.env.VITE_STREAM_BASE_URL": JSON.stringify(
+      "http://YOUR_BASE_URL"
+    ),
+    "import.meta.env.VITE_STREAM_USERNAME": JSON.stringify("YOUR_USERNAME"),
+    "import.meta.env.VITE_STREAM_PASSWORD": JSON.stringify("YOUR_PASSWORD")
   },
   plugins: [
     hexColorTransform({
