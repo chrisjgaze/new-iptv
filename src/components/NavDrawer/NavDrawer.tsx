@@ -65,11 +65,14 @@ export default function NavDrawer(props) {
   }
 
   const selectedButton = createMemo(() => {
-    if (useMatch(() => "/browse/all")()) return 366;
-    if (useMatch(() => "/browse/movie")()) return 462;
-    if (useMatch(() => "/browse/tv")()) return 548;
-    if (useMatch(() => "/examples")()) return 638;
-    return 366;
+    const base = 366;
+    const step = 90;
+    let index = 0;
+    if (useMatch(() => "/browse/movie")()) index = 1;
+    if (useMatch(() => "/browse/tv")()) index = 2;
+    if (useMatch(() => "/categories")()) index = 3;
+    if (useMatch(() => "/examples")()) index = 4;
+    return base + step * index;
   });
 
   return (
@@ -125,6 +128,14 @@ export default function NavDrawer(props) {
           onEnter={() => handleNavigate("/browse/tv")}
         >
           TV
+        </NavButton>
+        <NavButton
+          icon="movie"
+          iconColor={"#fff"}
+          announce={["Categories", "button"]}
+          onEnter={() => handleNavigate("/categories")}
+        >
+          Categories
         </NavButton>
         <NavButton
           icon="experiment"

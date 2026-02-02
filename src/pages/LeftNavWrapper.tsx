@@ -46,7 +46,7 @@ const LeftNavWrapper = (props) => {
 
   const [showWidgets, setShowWidgets] = createSignal(true);
   const location = useLocation();
-  const showOnPaths = ["/browse", "/entity"];
+  const showOnPaths = ["/browse", "/entity", "/categories"];
   createEffect(() => {
     const currentPath = location.pathname;
     let matchesPartial = showOnPaths.some((path) =>

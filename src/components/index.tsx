@@ -14,6 +14,7 @@ export function Thumbnail(props: IntrinsicNodeProps & { item: Tile }) {
   return (
     <Image
       {...props}
+      crossOrigin="anonymous"
       id="thumbnail"
       src={props.item.src}
       placeholder="./assets/fallback.png"
@@ -122,6 +123,7 @@ export function Poster(props: NodeProps) {
   return (
     <View
       src={props.item?.src}
+      crossOrigin="anonymous"
       title={props.item?.shortTitle}
       backdrop={props.item?.backdrop}
       {...props}
@@ -156,6 +158,7 @@ export function PosterTitle(props: NodeProps & { title: string }) {
   return (
     <View
       src={props.item?.src}
+      crossOrigin="anonymous"
       backdrop={props.item?.backdrop}
       {...props}
       onFail={(node) => (node.src = "failback.png")}
@@ -201,12 +204,20 @@ export function Hero(
     <View
       {...props}
       src={props.item.backdrop}
+      crossOrigin="anonymous"
       style={heroStyles}
       onFocusChanged={setHasFocus}
       forwardStates
     >
       <View transition={{ alpha: heroTransition }} alpha={hasFocus() ? 1 : 0}>
-        <View width={185} height={278} x={54} y={220} src={props.item.src} />
+        <View
+          width={185}
+          height={278}
+          x={54}
+          y={220}
+          src={props.item.src}
+          crossOrigin="anonymous"
+        />
         <Text
           y={520}
           x={54}

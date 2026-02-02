@@ -30,6 +30,7 @@ import { tmdbData, destroyData } from "./api/tmdbData";
 import NotFound from "./pages/NotFound";
 import fonts from "./fonts";
 import { browsePreload } from "./api/browsePreload";
+import { categoriesPreload } from "./api/categoriesPreload";
 import { entityPreload } from "./api/entityPreload";
 import LeftNavWrapper from "./pages/LeftNavWrapper";
 import theme from "theme";
@@ -153,6 +154,12 @@ render(() => {
             path="browse/:filter"
             component={Browse}
             preload={browsePreload}
+          />
+          <KeepAliveRoute
+            id="categories"
+            path="categories"
+            component={Browse}
+            preload={categoriesPreload}
           />
           <Route path="loops" component={Loops} preload={tmdbData} />
           <Route path="infinite" component={Infinite} preload={tmdbData} />

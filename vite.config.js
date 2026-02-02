@@ -44,9 +44,9 @@ export default defineConfig(({ mode }) => ({
     // Terser is required for better legacy transpilation
     minify: "terser",
     terserOptions: {
-    compress: {
-      keep_fnames: true, // Prevents function name mangling that breaks the renderer
-      keep_classnames: true
+      compress: {
+        keep_fnames: true, // Prevents function name mangling that breaks the renderer
+        keep_classnames: true
       }
     },
     sourcemap: false,
@@ -77,6 +77,17 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     port: 5174,
-    hmr: true
+    hmr: true,
+    proxy: {
+      "/get_categories": {
+        target: "http://172.20.3.54:8000",
+        changeOrigin: true
+      },
+      "/tmdb-image": {
+        target: "https://image.tmdb.org/t/p",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/tmdb-image/, "")
+      }
+    }
   }
 }));

@@ -11,8 +11,9 @@ import {
   assertTruthy
 } from "@lightningtv/solid";
 import { Column, VirtualGrid, Image } from "@lightningtv/solid/primitives";
-import { useNavigate, usePreloadRoute } from "@solidjs/router";
+import { useNavigate, usePreloadRoute, useMatch } from "@solidjs/router";
 import { Thumbnail, TileRow } from "../components";
+import { Text, hexColor } from "@lightningtv/solid";
 import styles from "../styles";
 import { setGlobalBackground } from "../state";
 import { createInfiniteScroll } from "../components/pagination";
@@ -25,6 +26,7 @@ const Browse = (props) => {
   const navigate = useNavigate();
   let firstRun = true;
   let vgRef;
+  const isCategories = useMatch(() => "/categories");
 
   onCleanup(() => {
     console.log('cleanup');
@@ -56,6 +58,8 @@ const Browse = (props) => {
 
       if (item.heroContent) {
         setHeroContent(item.heroContent);
+      } else if (isCategories() && item.title) {
+        setHeroContent({ title: item.title, description: "Category" });
       }
 
       // preload(`/browse/tv`, { preloadData: true });
@@ -75,6 +79,8 @@ const Browse = (props) => {
 
     if (item.heroContent) {
       delayedHero(item.heroContent);
+    } else if (isCategories() && item.title) {
+      delayedHero({ title: item.title, description: "Category" });
     }
   }
 
@@ -87,7 +93,9 @@ const Browse = (props) => {
     let entity = this.children.find((c) =>
       c.states!.has("focus")
     ) as ElementNode;
-    assertTruthy(entity && entity.item?.href);
+    if (!entity?.item?.href || isCategories()) {
+      return true;
+    }
     navigate(entity.item.href);
     return true;
   }
@@ -102,7 +110,13 @@ const Browse = (props) => {
           id="BrowseGrid"
           ref={vgRef}
           scroll="always"
-          announce={`All Trending ${props.params.filter}`}
+          announce={
+            props.params?.filter
+              ? `All Trending ${props.params.filter}`
+              : isCategories()
+                ? "Categories"
+                : "Browse"
+          }
           onEnter={onEnter}
           columns={7}
           gap={50}
@@ -114,9 +128,33 @@ const Browse = (props) => {
           width={1620}
           autofocus
           each={provider().pages()}>
-          {(item) =>
-            <Thumbnail item={item()} />
-          }
+          {(item) => {
+            const current = item();
+            if (isCategories()) {
+              return (
+                <View
+                  style={styles.Thumbnail}
+                  color={hexColor("0b0b0f")}
+                  forwardStates
+                  display="flex"
+                  justifyContent="center"
+                  alignItems="center"
+                  item={current}
+                >
+                  <Text
+                    width={170}
+                    contain="width"
+                    fontSize={22}
+                    textAlign="center"
+                    color={hexColor("ffffff")}
+                  >
+                    {current.title}
+                  </Text>
+                </View>
+              );
+            }
+            return <Thumbnail item={current} />;
+          }}
         </VirtualGrid>
       </View>
     </Show>
