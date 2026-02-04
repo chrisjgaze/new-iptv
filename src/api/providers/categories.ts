@@ -1,7 +1,6 @@
 import type { Tile } from "../formatters/ItemFormatter";
 
-const CATEGORIES_URL =
-  import.meta.env.VITE_CATEGORIES_URL || "/get_categories";
+const CATEGORIES_URL = import.meta.env.VITE_CATEGORIES_URL;
 
 type RawCategory = {
   category_id?: string | number;

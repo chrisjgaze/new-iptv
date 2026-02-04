@@ -1,30 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets"
-  id="http://yourdomain/Template01" version="0.2.1" viewmodes="maximized">
+<widget xmlns="http://www.w3.org/ns/widgets"
+  xmlns:tizen="http://tizen.org/ns/widgets"
+  id="http://yourdomain/Template01"
+  version="0.2.1"
+  viewmodes="maximized">
+
   <name>CJG Flix</name>
-  <icon src="icon.png"></icon>
-  <content src="index.html"></content>
-  <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"></feature>
-  <feature name="http://tizen.org/feature/webgl" />
-  <feature name="http://tizen.org/feature/opengles" />
-  <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="disable"
-    encryption="disable" install-location="auto" hwkey-event="enable"></tizen:setting>
-  <tizen:application id="bOtIKaCrZa.tizen" package="bOtIKaCrZa" required_version="2.3"></tizen:application>
-  <tizen:privilege name="http://tizen.org/privilege/application.launch"></tizen:privilege>
+  <icon src="icon.png" />
+  <content src="index.html" />
+
+  <tizen:profile name="tv" />
+
+  <tizen:setting screen-orientation="landscape"
+    context-menu="enable"
+    background-support="disable"
+    encryption="disable"
+    install-location="auto"
+    hwkey-event="enable" />
+
+  <tizen:application id="bOtIKaCrZa.tizen"
+    package="bOtIKaCrZa"
+    required_version="2.3" />
+
   <tizen:privilege name="http://tizen.org/privilege/internet" />
+  <tizen:privilege name="http://tizen.org/privilege/application.launch" />
   <tizen:privilege name="http://developer.samsung.com/privilege/avplay" />
-  <tizen:metadata key="http://samsung.com/tv/metadata/prelaunch.support" value="true"></tizen:metadata>
-  <tizen:metadata key="http://tizen.org/metadata/app_ui_type/base_screen_resolution"
-    value="extensive"></tizen:metadata>
-  <tizen:content-security-policy>
-    default-src 'self';
-    script-src 'self' 'unsafe-inline' 'unsafe-eval';
-    style-src 'self' 'unsafe-inline';
-    object-src 'none';
-    worker-src 'self' blob:;
-    media-src * blob:;
-    img-src * blob: data:;
-    connect-src *;
-</tizen:content-security-policy>
-  <tizen:profile name="tv"></tizen:profile>
+
+  <tizen:metadata key="http://samsung.com/tv/metadata/prelaunch.support" value="true" />
+
+  <tizen:content-security-policy><![CDATA[
+default-src 'self';
+script-src 'self' 'unsafe-inline' 'unsafe-eval';
+style-src 'self' 'unsafe-inline';
+object-src 'none';
+worker-src 'self' blob:;
+media-src * blob:;
+img-src * blob: data:;
+connect-src *;
+  ]]></tizen:content-security-policy>
+
 </widget>

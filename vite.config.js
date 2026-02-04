@@ -6,14 +6,7 @@ import hexColorTransform from "@lightningtv/vite-hex-transform";
 import path from "path";
 
 export default defineConfig(({ mode }) => ({
-  define: {
-    __DEV__: mode !== "production",
-    "import.meta.env.VITE_STREAM_BASE_URL": JSON.stringify(
-      "http://YOUR_BASE_URL"
-    ),
-    "import.meta.env.VITE_STREAM_USERNAME": JSON.stringify("YOUR_USERNAME"),
-    "import.meta.env.VITE_STREAM_PASSWORD": JSON.stringify("YOUR_PASSWORD")
-  },
+  define: {},
   plugins: [
     hexColorTransform({
       include: ["src/**/*.{ts,tsx,js,jsx}"]
@@ -84,7 +77,7 @@ export default defineConfig(({ mode }) => ({
     port: 5174,
     hmr: true,
     proxy: {
-      "/get_categories": {
+      "/get_categories1": {
         target: "http://192.168.1.219:8000",
         changeOrigin: true
       },
