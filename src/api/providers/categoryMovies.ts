@@ -2,7 +2,7 @@ import type { Tile } from "../formatters/ItemFormatter";
 
 const CATEGORY_MOVIES_BASE =
   import.meta.env.VITE_CATEGORY_MOVIES_BASE ||
-  "http://172.20.3.54:8000/categories";
+  "http://192.168.1.219:8000/categories";
 
 type RawMovie = {
   stream_id?: string | number;

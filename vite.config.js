@@ -85,15 +85,15 @@ export default defineConfig(({ mode }) => ({
     hmr: true,
     proxy: {
       "/get_categories": {
-        target: "http://172.20.3.54:8000",
+        target: "http://192.168.1.219:8000",
         changeOrigin: true
       },
       "/categories": {
-        target: "http://172.20.3.54:8000",
+        target: "http://192.168.1.219:8000",
         changeOrigin: true
       },
       "/get_plot": {
-        target: "http://172.20.3.54:8000",
+        target: "http://192.168.1.219:8000",
         changeOrigin: true
       },
       "/tmdb-image": {

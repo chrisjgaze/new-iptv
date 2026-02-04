@@ -5,7 +5,7 @@ import { useMatch } from "@solidjs/router";
 import { setGlobalBackground } from "../state";
 import theme from "theme";
 
-const CATEGORIES_URL = "http://172.20.3.54:8000/categories";
+const CATEGORIES_URL = "http://192.168.1.219:8000/categories";
 
 const pageStyles = {
   width: 1920,
