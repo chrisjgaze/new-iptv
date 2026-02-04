@@ -1,4 +1,5 @@
 import {
+  createEffect,
   createMemo,
   createSignal,
   Show,
@@ -11,7 +12,12 @@ import {
   assertTruthy
 } from "@lightningtv/solid";
 import { Column, VirtualGrid, Image } from "@lightningtv/solid/primitives";
-import { useNavigate, usePreloadRoute, useMatch, useLocation } from "@solidjs/router";
+import {
+  useNavigate,
+  usePreloadRoute,
+  useMatch,
+  useLocation
+} from "@solidjs/router";
 import { Thumbnail, TileRow } from "../components";
 import { Text, hexColor } from "@lightningtv/solid";
 import styles from "../styles";
@@ -19,6 +25,7 @@ import { setGlobalBackground } from "../state";
 import { createInfiniteScroll } from "../components/pagination";
 import ContentBlock from "../components/ContentBlock";
 import { debounce } from "@solid-primitives/scheduled";
+import api, { getImageUrl } from "../api";
 
 const Browse = (props) => {
   const preload = usePreloadRoute();
@@ -29,19 +36,32 @@ const Browse = (props) => {
   const location = useLocation();
   const isCategoriesList = () => location.pathname === "/categories";
   const isCategoryMovies = useMatch(() => "/categories/:id");
+
   const isCategoryRoute = useMatch(() => "/categories/*all");
-  const plotBase = import.meta.env.VITE_PLOT_URL || "/get_plot";
+  const plotBase = import.meta.env.VITE_PLOT_URL;
+  //const plotBase = import.meta.env.VITE_PLOT_URL || "/get_plot";
   const plotDebug = (() => {
     const search = new URLSearchParams(window.location.search);
     if (search.get("plotDebug") === "true") return true;
     const hash = window.location.hash || "";
     return hash.includes("plotDebug=true");
   })();
+  const bgDebug = (() => {
+    const search = new URLSearchParams(window.location.search);
+    if (search.get("bgDebug") === "true") return true;
+    const hash = window.location.hash || "";
+    return hash.includes("bgDebug=true");
+  })();
   const [debugLine, setDebugLine] = createSignal("");
   const [debugPlotUrl, setDebugPlotUrl] = createSignal("");
   const [debugCount, setDebugCount] = createSignal(0);
+  const [bgDebugLine, setBgDebugLine] = createSignal("");
   const plotCache = new Map<string, string>();
   const plotInFlight = new Map<string, Promise<string>>();
+  const backdropCache = new Map<string, string>();
+  const backdropInFlight = new Map<string, Promise<string>>();
+  const backdropSearchCache = new Map<string, string>();
+  const backdropSearchInFlight = new Map<string, Promise<string>>();
   let plotToken = 0;
 
   function fetchPlot(tmdbId: string): Promise<string> {
@@ -86,21 +106,220 @@ const Browse = (props) => {
   }
 
   onCleanup(() => {
-    console.log('cleanup');
-  })
+    console.log("cleanup");
+  });
 
   const provider = createMemo(() => {
     return createInfiniteScroll(props.data());
   });
 
-  const delayedBackgrounds = debounce(
-    (img: string) => setGlobalBackground(img),
-    800
-  );
+  const delayedBackgrounds = debounce((img: string | number) => {
+    if (bgDebug) {
+      setBgDebugLine(`bg=item.backdrop ${img}`);
+    }
+    setGlobalBackground(img);
+  }, 800);
+  const delayedTmdbBackgrounds = debounce((img: string) => {
+    if (bgDebug) {
+      setBgDebugLine(`bg=tmdb ${img}`);
+    }
+    setGlobalBackground(img);
+  }, 800);
   const delayedHero = debounce(
     (content: {}) => setHeroContent(content || {}),
     600
   );
+
+  function setBackgroundDirect(img: string | number, source: string) {
+    if (bgDebug) {
+      setBgDebugLine(`bg=${source} ${typeof img === "string" ? img : "color"}`);
+    }
+    setGlobalBackground(img);
+  }
+
+  function fetchBackdrop(tmdbId: string): Promise<string> {
+    if (backdropCache.has(tmdbId)) {
+      return Promise.resolve(backdropCache.get(tmdbId) || "");
+    }
+    if (backdropInFlight.has(tmdbId)) {
+      return backdropInFlight.get(tmdbId)!;
+    }
+    const request = api
+      .get(`/movie/${tmdbId}`)
+      .then((data: any) => getImageUrl(data?.backdrop_path, "w1280") || "")
+      .then((url) => {
+        backdropCache.set(tmdbId, url);
+        backdropInFlight.delete(tmdbId);
+        return url;
+      })
+      .catch(() => {
+        backdropCache.set(tmdbId, "");
+        backdropInFlight.delete(tmdbId);
+        return "";
+      });
+    backdropInFlight.set(tmdbId, request);
+    return request;
+  }
+
+  function fetchBackdropByTitle(title: string): Promise<string> {
+    const key = title.trim().toLowerCase();
+    if (!key) return Promise.resolve("");
+    if (backdropSearchCache.has(key)) {
+      return Promise.resolve(backdropSearchCache.get(key) || "");
+    }
+    if (backdropSearchInFlight.has(key)) {
+      return backdropSearchInFlight.get(key)!;
+    }
+
+    const request = api
+      .get(`/search/movie?query=${encodeURIComponent(title)}`)
+      .then(
+        (data: any) =>
+          getImageUrl(data?.results?.[0]?.backdrop_path, "w1280") || ""
+      )
+      .then((url) => {
+        backdropSearchCache.set(key, url);
+        backdropSearchInFlight.delete(key);
+        return url;
+      })
+      .catch(() => {
+        backdropSearchCache.set(key, "");
+        backdropSearchInFlight.delete(key);
+        return "";
+      });
+
+    backdropSearchInFlight.set(key, request);
+    return request;
+  }
+
+  function applySelection(item: any, immediate = false) {
+    if (!item) {
+      if (isCategoryMovies()) {
+        if (immediate) {
+          setBackgroundDirect(0x0b0b0fff, "fallback");
+        } else {
+          delayedBackgrounds(0x0b0b0fff);
+        }
+        setHeroContent({
+          title: "Category Movies",
+          description: ""
+        });
+      }
+      return;
+    }
+
+    const backdrop = item.backdrop;
+    const hasImageBackdrop =
+      typeof backdrop === "string" && backdrop.trim().length > 0;
+
+    if (hasImageBackdrop) {
+      if (immediate) {
+        setBackgroundDirect(backdrop, "item.backdrop");
+      } else {
+        delayedBackgrounds(backdrop);
+      }
+    } else if (isCategoryMovies() && (item.tmdb || item.item?.tmdb)) {
+      const tmdbId = item.tmdb || item.item?.tmdb;
+      fetchBackdrop(String(tmdbId)).then((url) => {
+        if (!url) {
+          if (immediate) {
+            setBackgroundDirect(0x0b0b0fff, "fallback");
+          } else {
+            delayedBackgrounds(0x0b0b0fff);
+          }
+          return;
+        }
+        if (immediate) {
+          setBackgroundDirect(url, "tmdb");
+        } else {
+          delayedTmdbBackgrounds(url);
+        }
+      });
+    } else if (isCategoryMovies() && item.title) {
+      fetchBackdropByTitle(String(item.title)).then((url) => {
+        if (!url) {
+          if (immediate) {
+            setBackgroundDirect(0x0b0b0fff, "fallback");
+          } else {
+            delayedBackgrounds(0x0b0b0fff);
+          }
+          return;
+        }
+        if (immediate) {
+          setBackgroundDirect(url, "tmdb-search");
+        } else {
+          delayedTmdbBackgrounds(url);
+        }
+      });
+    } else if (isCategoryMovies()) {
+      if (immediate) {
+        setBackgroundDirect(0x0b0b0fff, "fallback");
+      } else {
+        delayedBackgrounds(0x0b0b0fff);
+      }
+    }
+
+    const setHero = immediate ? setHeroContent : delayedHero;
+
+    const ratingValue = Number(item.item?.rating ?? item.rating);
+    const hasRating = Number.isFinite(ratingValue);
+
+    if (item.item?.stream_id && item.title && (item.tmdb || item.item?.tmdb)) {
+      const tmdbId = item.tmdb || item.item?.tmdb;
+      const token = ++plotToken;
+      const url = `${plotBase}/${tmdbId}`;
+      if (plotDebug) {
+        console.log("plot request", { tmdbId, title: item.title, url });
+        setDebugLine(
+          `plot=${url} title=${item.title || ""} tmdb=${tmdbId || ""}`
+        );
+        setDebugPlotUrl(url);
+      }
+      setHero({
+        title: item.title,
+        description: "Plot placeholder...",
+        metaText: hasRating ? `Rating ${ratingValue}` : "",
+        voteAverage: hasRating ? ratingValue : undefined,
+        voteCount: hasRating ? 1 : undefined
+      });
+      fetchPlot(String(tmdbId)).then((plot) => {
+        if (token !== plotToken || !plot) return;
+        if (plotDebug) {
+          console.log("plot response", { tmdbId, length: plot.length });
+        }
+        setHero({
+          title: item.title,
+          description: plot,
+          metaText: hasRating ? `Rating ${ratingValue}` : "",
+          voteAverage: hasRating ? ratingValue : undefined,
+          voteCount: hasRating ? 1 : undefined
+        });
+      });
+      return;
+    }
+
+    if (item.heroContent) {
+      setHero(item.heroContent);
+      return;
+    }
+    if (isCategoryMovies() && item.title) {
+      setHero({
+        title: item.title,
+        description: hasRating ? `Rating ${ratingValue}` : "Movie"
+      });
+      return;
+    }
+    if (isCategoryMovies()) {
+      setHero({
+        title: "Category Movies",
+        description: ""
+      });
+      return;
+    }
+    if (isCategoriesList() && item.title) {
+      setHero({ title: item.title, description: "Category" });
+    }
+  }
 
   function updateContentBlock(_index, _col, elm) {
     if (!elm) {
@@ -118,53 +337,9 @@ const Browse = (props) => {
     }
 
     if (firstRun) {
-      // no content set yet, set right away
-      if (item.backdrop) {
-        setGlobalBackground(item.backdrop);
-      }
-
-      if (item.item?.stream_id && item.title && (item.tmdb || item.item?.tmdb)) {
-        const tmdbId = item.tmdb || item.item?.tmdb;
-        const ratingValue = Number(item.item?.rating ?? item.rating);
-        const hasRating = Number.isFinite(ratingValue);
-        const token = ++plotToken;
-        const url = `${plotBase}/${tmdbId}`;
-        if (plotDebug) {
-          console.log("plot request", { tmdbId, title: item.title, url });
-          setDebugLine(
-            `plot=${url} title=${item.title || ""} tmdb=${tmdbId || ""}`
-          );
-          setDebugPlotUrl(url);
-        }
-        setHeroContent({
-          title: item.title,
-          description: "Plot placeholder...",
-          metaText: hasRating ? `Rating ${ratingValue}` : "",
-          voteAverage: hasRating ? ratingValue : undefined,
-          voteCount: hasRating ? 1 : undefined
-        });
-        fetchPlot(String(tmdbId)).then((plot) => {
-          if (token !== plotToken || !plot) return;
-          if (plotDebug) {
-            console.log("plot response", { tmdbId, length: plot.length });
-          }
-          setHeroContent({
-            title: item.title,
-            description: plot,
-            metaText: hasRating ? `Rating ${ratingValue}` : "",
-            voteAverage: hasRating ? ratingValue : undefined,
-            voteCount: hasRating ? 1 : undefined
-          });
-        });
-      } else if (item.heroContent) {
-        setHeroContent(item.heroContent);
-      } else if (isCategoriesList() && item.title) {
-        setHeroContent({ title: item.title, description: "Category" });
-      }
-
+      applySelection(item, true);
       // preload(`/browse/tv`, { preloadData: true });
       // preload(`/browse/movie`, { preloadData: true });
-
       firstRun = false;
       return;
     }
@@ -173,53 +348,7 @@ const Browse = (props) => {
       // preload(item.href, { preloadData: true });
     }
 
-    if (item.backdrop) {
-      delayedBackgrounds(item.backdrop);
-    }
-
-    if (item.item?.stream_id && item.title && (item.tmdb || item.item?.tmdb)) {
-      const tmdbId = item.tmdb || item.item?.tmdb;
-      const ratingValue = Number(item.item?.rating ?? item.rating);
-      const hasRating = Number.isFinite(ratingValue);
-      const token = ++plotToken;
-      const url = `${plotBase}/${tmdbId}`;
-      if (plotDebug) {
-        console.log("plot request", { tmdbId, title: item.title, url });
-        setDebugLine(
-          `plot=${url} title=${item.title || ""} tmdb=${tmdbId || ""}`
-        );
-        setDebugPlotUrl(url);
-      }
-      setHeroContent({
-        title: item.title,
-        description: "Plot placeholder...",
-        metaText: hasRating ? `Rating ${ratingValue}` : "",
-        voteAverage: hasRating ? ratingValue : undefined,
-        voteCount: hasRating ? 1 : undefined
-      });
-      fetchPlot(String(tmdbId)).then((plot) => {
-        if (token !== plotToken || !plot) return;
-        if (plotDebug) {
-          console.log("plot response", { tmdbId, length: plot.length });
-        }
-        setHeroContent({
-          title: item.title,
-          description: plot,
-          metaText: hasRating ? `Rating ${ratingValue}` : "",
-          voteAverage: hasRating ? ratingValue : undefined,
-          voteCount: hasRating ? 1 : undefined
-        });
-      });
-      return;
-    }
-    if (item.heroContent) {
-      delayedHero(item.heroContent);
-      return;
-    }
-    if (isCategoriesList() && item.title) {
-      delayedHero({ title: item.title, description: "Category" });
-      return;
-    }
+    applySelection(item, false);
   }
 
   function onEndReached(this: ElementNode) {
@@ -238,10 +367,22 @@ const Browse = (props) => {
     return true;
   }
 
+  createEffect(() => {
+    const pages = provider().pages();
+    if (!firstRun || !pages.length) return;
+    applySelection(pages[0], true);
+    firstRun = false;
+  });
+
   return (
     <Show when={provider().pages().length}>
-      <ContentBlock y={360} x={162} content={heroContent()} forwardFocus={() => vgRef.setFocus()} />
-      {plotDebug && (
+      <ContentBlock
+        y={360}
+        x={162}
+        content={heroContent()}
+        forwardFocus={() => vgRef.setFocus()}
+      />
+      {(plotDebug || bgDebug) && (
         <>
           <Text
             x={162}
@@ -262,6 +403,16 @@ const Browse = (props) => {
             color={hexColor("ffcc00")}
           >
             {debugPlotUrl()}
+          </Text>
+          <Text
+            x={162}
+            y={360}
+            width={1400}
+            contain="width"
+            fontSize={18}
+            color={hexColor("ffcc00")}
+          >
+            {bgDebugLine()}
           </Text>
         </>
       )}
@@ -291,7 +442,8 @@ const Browse = (props) => {
           onEndReachedThreshold={22}
           width={1620}
           autofocus
-          each={provider().pages()}>
+          each={provider().pages()}
+        >
           {(item) => {
             const current = item();
             if (isCategoriesList()) {

@@ -1,4 +1,5 @@
 import type { Tile } from "../formatters/ItemFormatter";
+import { getImageUrl } from "../index";
 
 const CATEGORY_MOVIES_BASE =
   import.meta.env.VITE_CATEGORY_MOVIES_BASE ||
@@ -12,6 +13,12 @@ type RawMovie = {
   tmdb?: string | number;
   category_id?: string | number;
   container_extension?: string;
+  backdrop_path?: string;
+  backdrop?: string;
+  background?: string;
+  cover_big?: string;
+  cover?: string;
+  movie_image?: string;
 };
 
 function normalizeMovies(payload: unknown): RawMovie[] {
@@ -27,6 +34,30 @@ function proxyImage(src?: string) {
   if (!src.includes("image.tmdb.org/t/p/")) return src;
   const base = proxyBase.endsWith("/") ? proxyBase : `${proxyBase}/`;
   return src.replace("https://image.tmdb.org/t/p/", base);
+}
+
+function pickBackdrop(item: RawMovie, posterUrl: string) {
+  const candidate =
+    item.backdrop_path ||
+    item.backdrop ||
+    item.background ||
+    item.movie_image ||
+    item.cover_big ||
+    item.cover;
+
+  if (!candidate || candidate === item.stream_icon) return "";
+
+  if (candidate.startsWith("http")) {
+    return proxyImage(candidate);
+  }
+
+  if (candidate.startsWith("/")) {
+    return getImageUrl(candidate, "w1280");
+  }
+
+  if (candidate === posterUrl) return "";
+
+  return "";
 }
 
 const STREAM_BASE_URL =
@@ -48,13 +79,14 @@ function toTiles(items: RawMovie[]): Tile[] {
       const id = item.stream_id ?? index + 1;
       const tmdbId = item.tmdb ? String(item.tmdb) : "";
       const img = proxyImage(item.stream_icon);
+      const backdrop = pickBackdrop(item, img);
       const rating = item.rating ? `Rating ${item.rating}` : "";
       const streamUrl = buildStreamUrl(id, item.container_extension);
       const ext = item.container_extension || "mkv";
       return {
         src: img,
         tileSrc: img,
-        backdrop: img || 0x0b0b0fff,
+        backdrop: backdrop || "",
         href: tmdbId
           ? `/entity/movie/${tmdbId}?stream_id=${id}&ext=${ext}`
           : "",
