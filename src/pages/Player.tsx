@@ -126,6 +126,7 @@ const Player = () => {
     init(parent);
     const streamId = params.id;
     const streamUrl = `${streamBase}/movie/${streamUser}/${streamPass}/${streamId}.${ext}`;
+    console.log("Playing stream URL:", streamUrl);
     load({ streamUrl });
     play();
   });

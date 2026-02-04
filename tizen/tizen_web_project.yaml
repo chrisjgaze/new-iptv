@@ -27,47 +27,47 @@ trust_anchor: []
 
 # list of files in web project (.html,.css etc) and resources
 files:
-  - assets/ButtonsMaterial-legacy-8Wu7CxPB.js
-  - assets/Components-legacy-DEK9RMl8.js
-  - assets/Create-legacy-C4Da11rs.js
-  - assets/Entity-legacy-DgT_wn2L.js
-  - assets/Firebolt-legacy-C_Om3GSy.js
-  - assets/Flex-legacy-ChHSiWtU.js
-  - assets/FlexColumn-legacy-CNq2BOtr.js
-  - assets/FlexColumnSize-legacy-uJaMen5N.js
-  - assets/FlexGrow-legacy-nl-ND8Xo.js
-  - assets/FlexMenu-legacy-DBB4eTtZ.js
-  - assets/FlexSize-legacy-BC93ppC3.js
-  - assets/FocusBasics-legacy-OfcVHiTM.js
-  - assets/FocusHandling-legacy-DGzJ-qI0.js
-  - assets/Gradients-legacy-BzDXBj-9.js
-  - assets/Grid-legacy-B5zeMvPO.js
-  - assets/Infinite-legacy-CShHzk4z.js
-  - assets/KeepAlive-legacy-Dn5ERlTV.js
-  - assets/KeyHandling-legacy-BX7v2bnD.js
-  - assets/Layout-legacy-KPN014GC.js
-  - assets/Login-legacy-BzAr5jqo.js
-  - assets/Loops-legacy-D1cvA_lh.js
-  - assets/Matrix-legacy-CNgTnaEe.js
-  - assets/Nested-legacy-ebUEw50U.js
-  - assets/People-legacy-Biouj6Fk.js
-  - assets/Player-legacy-CmJvcSUQ.js
-  - assets/Portal-legacy-BIEJ2KkT.js
-  - assets/Positioning-legacy-DApYhzva.js
-  - assets/SuperFlex-legacy-CZVLbsWS.js
-  - assets/TMDBGrid-legacy-BZz54-6V.js
-  - assets/Tags-legacy-cSO1GzHF.js
-  - assets/Text-legacy-B3iU7Y5o.js
-  - assets/TextPoster-legacy-0z5z14Fk.js
-  - assets/Transitions-legacy-BYnpP1MC.js
-  - assets/Viewport-legacy-DdBvkup7.js
-  - assets/Virtual-legacy-CEOCbgxP.js
+  - assets/ButtonsMaterial-legacy-CZDj8Hrv.js
+  - assets/Components-legacy-BXIA9CVc.js
+  - assets/Create-legacy-DUdPNQbB.js
+  - assets/Entity-legacy-tte9hcoM.js
+  - assets/Firebolt-legacy-DiHXjoz3.js
+  - assets/Flex-legacy-Dg5EB-VB.js
+  - assets/FlexColumn-legacy-BMQ4QqZ2.js
+  - assets/FlexColumnSize-legacy-BFAIUGVT.js
+  - assets/FlexGrow-legacy-CItGQgA5.js
+  - assets/FlexMenu-legacy-fZQYdya_.js
+  - assets/FlexSize-legacy-CsAxwJQ1.js
+  - assets/FocusBasics-legacy-G1sNo9yq.js
+  - assets/FocusHandling-legacy-F5M4Alxa.js
+  - assets/Gradients-legacy-kf0UiHYD.js
+  - assets/Grid-legacy-BvErEnJe.js
+  - assets/Infinite-legacy-CotQ66LE.js
+  - assets/KeepAlive-legacy-C4BFrMBx.js
+  - assets/KeyHandling-legacy-Cd6RBnpm.js
+  - assets/Layout-legacy-CHbAEF3U.js
+  - assets/Login-legacy-7eWq_YeS.js
+  - assets/Loops-legacy-C5k0fs2G.js
+  - assets/Matrix-legacy-CC3ZYCQL.js
+  - assets/Nested-legacy-BO04Pu2j.js
+  - assets/People-legacy-DgBF3cQG.js
+  - assets/Player-legacy-DigMqlKL.js
+  - assets/Portal-legacy-BqfNl5hM.js
+  - assets/Positioning-legacy-DFUOVjqF.js
+  - assets/SuperFlex-legacy-CeVUenrt.js
+  - assets/TMDBGrid-legacy-ByvFT8-b.js
+  - assets/Tags-legacy-DUqATUbH.js
+  - assets/Text-legacy-DeEdRcqJ.js
+  - assets/TextPoster-legacy-fcBempl7.js
+  - assets/Transitions-legacy-Jh5g-dfn.js
+  - assets/Viewport-legacy-BWUOBNDU.js
+  - assets/Virtual-legacy-Clv4q_VU.js
   - assets/fallback.png
   - assets/favicon-32x32.png
   - assets/hero-mask-inverted.png
   - assets/icons.png
   - assets/icons_white.png
-  - assets/index-legacy-CR_fy_j5.js
+  - assets/index-legacy-BzgAOVH1.js
   - assets/playIcon.png
   - assets/polyfills-legacy-BnkUR95T.js
   - assets/rt-popcorn.png
@@ -77,7 +77,7 @@ files:
   - assets/spinner.gif
   - assets/stars-full.png
   - assets/stars.png
-  - assets/suspense-legacy-TmpvCC_-.js
+  - assets/suspense-legacy-D4-CdSVt.js
   - assets/thumbsDown.png
   - assets/thumbsUp.png
   - assets/tmdb.png
