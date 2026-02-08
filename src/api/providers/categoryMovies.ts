@@ -3,7 +3,7 @@ import { getImageUrl } from "../index";
 
 const CATEGORY_MOVIES_BASE =
   import.meta.env.VITE_CATEGORY_MOVIES_BASE ||
-  "http://192.168.1.219:8000/categories";
+  "http://192.168.1.46:5000";
 
 type RawMovie = {
   stream_id?: string | number;
@@ -110,7 +110,8 @@ function toTiles(items: RawMovie[]): Tile[] {
 export default function categoryMoviesProvider(categoryId: string) {
   return async (pageIndex: number): Promise<Tile[]> => {
     if (pageIndex > 1) return [];
-    const response = await fetch(`${CATEGORY_MOVIES_BASE}/${categoryId}/movies`);
+    //const response = await fetch(`${CATEGORY_MOVIES_BASE}/${categoryId}/movies`);
+    const response = await fetch(`${CATEGORY_MOVIES_BASE}/category/${categoryId}/movies`);
     if (!response.ok) {
       throw new Error(`Failed to load category movies (${response.status})`);
     }

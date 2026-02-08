@@ -131,12 +131,12 @@ export default function NavDrawer(props) {
           TV
         </NavButton>
         <NavButton
-          icon="movie"
+          icon="series"
           iconColor={"#fff"}
           announce={["Categories", "button"]}
           onEnter={() => handleNavigate("/categories")}
         >
-          Categories
+          Series
         </NavButton>
         <NavButton
           icon="experiment"
