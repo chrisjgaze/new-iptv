@@ -5,9 +5,9 @@ import {
   View,
   hexColor
 } from "@lightningtv/solid";
-import { onMount } from "solid-js";
+import { createSignal, onCleanup, onMount } from "solid-js";
 import { setGlobalBackground } from "../state";
-import { init, load, play } from "../video";
+import { init, load, getBuffering, getState } from "../video";
 import { useNavigate } from "@solidjs/router";
 import { useParams } from "@solidjs/router";
 
@@ -15,7 +15,10 @@ const Player = () => {
   let parent;
   const navigate = useNavigate();
   const params = useParams();
-  const streamBase = import.meta.env.VITE_STREAM_BASE_URL || "http://YOUR_BASE_URL";
+  const [isReady, setIsReady] = createSignal(false);
+  const [spinnerFrame, setSpinnerFrame] = createSignal("|");
+  const streamBase =
+    import.meta.env.VITE_STREAM_BASE_URL || "http://YOUR_BASE_URL";
   const streamUser = import.meta.env.VITE_STREAM_USERNAME || "YOUR_USERNAME";
   const streamPass = import.meta.env.VITE_STREAM_PASSWORD || "YOUR_PASSWORD";
   const urlParams = new URLSearchParams(window.location.search);
@@ -120,18 +123,55 @@ const Player = () => {
     fontWeight: 100
   };
 
-  onMount(() => {
+  const READY_STATES = new Set(["READY", "PLAYING", "PAUSED"]);
+
+  onMount(async () => {
     setGlobalBackground("#000000");
     parent = document.querySelector('[data-testid="player"]') as HTMLElement;
-    init(parent);
+    await init(parent);
     const streamId = params.id;
     const streamUrl = `${streamBase}/movie/${streamUser}/${streamPass}/${streamId}.${ext}`;
-    console.log("Playing stream URL:", streamUrl);
+    const newUrl = "http://192.168.1.46:8080/p/?u=" + streamUrl;
+    console.log("Playing stream URL:", newUrl);
     load({ streamUrl });
-    play();
   });
 
-  return <View autofocus onBack={() => navigate(-1)}></View>;
+  const stateTimer = setInterval(() => {
+    const state = getState?.() || null;
+    const ready = state ? READY_STATES.has(state) : false;
+    const buffering = getBuffering?.() || false;
+    setIsReady(ready && !buffering);
+  }, 300);
+
+  const frames = ["|", "/", "-", "\\"];
+  let frameIndex = 0;
+  const spinnerTimer = setInterval(() => {
+    frameIndex = (frameIndex + 1) % frames.length;
+    setSpinnerFrame(frames[frameIndex]);
+  }, 120);
+
+  onCleanup(() => {
+    clearInterval(stateTimer);
+    clearInterval(spinnerTimer);
+  });
+
+  return (
+    <View autofocus onBack={() => navigate(-1)}>
+      {!isReady() && (
+        <View x={0} y={0} width={1920} height={1080} color={0x000000cc}>
+          <Text
+            x={960}
+            y={520}
+            fontSize={36}
+            textAlign="center"
+            style={{ letterSpacing: 2 }}
+          >
+            LOADING {spinnerFrame()}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
 };
 
 export default Player;

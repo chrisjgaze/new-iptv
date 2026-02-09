@@ -4,7 +4,8 @@
 let videoElement = null;
 
 export const state = {
-  playingState: false
+  playingState: false,
+  buffering: false
 };
 
 // Map AVPlay states to your app state
@@ -35,15 +36,44 @@ export const load = async (config) => {
   }
 
   try {
-    // 1. Open the URL
-    webapis.avplay.open(config.streamUrl);
+    try {
+      const currentState = getState();
+      if (currentState && currentState !== STATES.IDLE) {
+        webapis.avplay.stop();
+        webapis.avplay.close();
+      }
+    } catch (e) {
+      console.error("AVPlay Pre-Open Cleanup Exception:", e);
+    }
 
+    // 1. Open the URL
+    const newUrl = "http://192.168.1.46:8080/p/?u=" + config.streamUrl;
+    console.log("Proxy URL " + newUrl);
+    //webapis.avplay.open(
+    //"http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+    //);
+    webapis.avplay.open(
+      "http://192.168.1.46:8080/p/?u=http://vpn.tsclean.cc/movie/6c82e7398a/a2bfaf950817/2006011.mkv"
+    );
+    //http://vpn.tsclean.cc/movie/6c82e7398a/a2bfaf950817/1998017.mp4
     // 2. Set listeners
     const listener = {
-      onbufferingstart: () => console.log("Buffering..."),
-      onbufferingcomplete: () => console.log("Buffering complete"),
-      onstreamcompleted: () => destroy(),
-      onerror: (type, data) => console.error("AVPlay Error:", type, data)
+      onbufferingstart: () => {
+        state.buffering = true;
+        console.log("Buffering...");
+      },
+      onbufferingcomplete: () => {
+        state.buffering = false;
+        console.log("Buffering complete");
+      },
+      onstreamcompleted: () => {
+        state.buffering = false;
+        destroy();
+      },
+      onerror: (type, data) => {
+        state.buffering = false;
+        console.error("AVPlay Error:", type, data);
+      }
     };
     webapis.avplay.setListener(listener);
 
@@ -71,32 +101,80 @@ export const load = async (config) => {
 
 export const play = () => {
   if (window.webapis && webapis.avplay) {
-    webapis.avplay.play();
-    state.playingState = true;
+    try {
+      webapis.avplay.play();
+      state.playingState = true;
+    } catch (e) {
+      console.error("AVPlay Play Exception:", e);
+    }
   }
 };
 
 export const pause = () => {
   if (window.webapis && webapis.avplay) {
-    webapis.avplay.pause();
-    state.playingState = false;
+    try {
+      webapis.avplay.pause();
+      state.playingState = false;
+    } catch (e) {
+      console.error("AVPlay Pause Exception:", e);
+    }
   }
 };
 
 export const destroy = async () => {
   if (window.webapis && webapis.avplay) {
-    webapis.avplay.stop();
-    webapis.avplay.close();
+    try {
+      const currentState = getState();
+      if (currentState && currentState !== STATES.IDLE) {
+        webapis.avplay.stop();
+      }
+      webapis.avplay.close();
+    } catch (e) {
+      console.error("AVPlay Destroy Exception:", e);
+    }
   }
   state.playingState = false;
 };
 
+export const getState = () => {
+  if (!window.webapis || !webapis.avplay || !webapis.avplay.getState) {
+    return null;
+  }
+  try {
+    return webapis.avplay.getState();
+  } catch (e) {
+    console.error("AVPlay getState Exception:", e);
+    return null;
+  }
+};
+
+export const getBuffering = () => state.buffering;
+
+const isTimeQueryableState = (s) =>
+  s === STATES.PLAYING || s === STATES.PAUSED || s === STATES.READY;
+
 export const getCurrentTime = () => {
-  return window.webapis ? webapis.avplay.getCurrentTime() / 1000 : 0;
+  if (!window.webapis || !webapis.avplay) return 0;
+  const s = getState();
+  if (!isTimeQueryableState(s)) return 0;
+  try {
+    return webapis.avplay.getCurrentTime() / 1000;
+  } catch (e) {
+    console.error("AVPlay getCurrentTime Exception:", e);
+    return 0;
+  }
 };
 
 export const getVideoDuration = () => {
-  return window.webapis ? webapis.avplay.getDuration() / 1000 : 0;
+  if (!window.webapis || !webapis.avplay) return 0;
+  const s = getState();
+  if (!isTimeQueryableState(s)) return 0;
+  try {
+    return webapis.avplay.getDuration() / 1000;
+  } catch (e) {
+    console.error("AVPlay getDuration Exception:", e);
+    return 0;
+  }
 };
 
 export const getTimeFormat = () => {
@@ -115,6 +193,8 @@ export default {
   getCurrentTime,
   getVideoDuration,
   getTimeFormat,
+  getState,
+  getBuffering,
   state,
   destroy
 };

@@ -109,7 +109,9 @@ function toTiles(items: RawMovie[]): Tile[] {
 
 export default function categoryMoviesProvider(categoryId: string) {
   return async (pageIndex: number): Promise<Tile[]> => {
+    if (!categoryId) return [];
     if (pageIndex > 1) return [];
+    console.log("Get category " +categoryId);
     //const response = await fetch(`${CATEGORY_MOVIES_BASE}/${categoryId}/movies`);
     const response = await fetch(`${CATEGORY_MOVIES_BASE}/category/${categoryId}/movies`);
     if (!response.ok) {
