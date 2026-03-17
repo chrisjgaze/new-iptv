@@ -2,6 +2,9 @@
  * video.js - Tizen Native AVPlay version
  */
 let videoElement = null;
+let currentUrl = null;
+let lastBufferStartMs = null;
+let lastBufferDurationMs = 0;
 
 export const state = {
   playingState: false,
@@ -47,23 +50,27 @@ export const load = async (config) => {
     }
 
     // 1. Open the URL
-    const newUrl = "http://192.168.1.46:8080/p/?u=" + config.streamUrl;
-    console.log("Proxy URL " + newUrl);
+    const url = config.streamUrl;
+    currentUrl = url;
+    console.log("AVPlay open URL:", url);
     //webapis.avplay.open(
     //"http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
     //);
-    webapis.avplay.open(
-      "http://192.168.1.46:8080/p/?u=http://vpn.tsclean.cc/movie/6c82e7398a/a2bfaf950817/2006011.mkv"
-    );
+    webapis.avplay.open(url);
     //http://vpn.tsclean.cc/movie/6c82e7398a/a2bfaf950817/1998017.mp4
     // 2. Set listeners
     const listener = {
       onbufferingstart: () => {
         state.buffering = true;
+        lastBufferStartMs = Date.now();
         console.log("Buffering...");
       },
       onbufferingcomplete: () => {
         state.buffering = false;
+        if (lastBufferStartMs) {
+          lastBufferDurationMs = Date.now() - lastBufferStartMs;
+          lastBufferStartMs = null;
+        }
         console.log("Buffering complete");
       },
       onstreamcompleted: () => {
@@ -77,8 +84,16 @@ export const load = async (config) => {
     };
     webapis.avplay.setListener(listener);
 
+    try {
+      webapis.avplay.setDisplayMethod("PLAYER_DISPLAY_MODE_FULL_SCREEN");
+    } catch (e) {
+      console.warn("AVPlay setDisplayMethod failed:", e);
+    }
+
     // 3. Set Display Area (Full Screen)
-    webapis.avplay.setDisplayRect(0, 0, window.innerWidth, window.innerHeight);
+    const width = window.innerWidth || 1920;
+    const height = window.innerHeight || 1080;
+    webapis.avplay.setDisplayRect(0, 0, width, height);
 
     // 4. Prepare (This is async on Tizen)
     return new Promise((resolve, reject) => {
@@ -149,6 +164,12 @@ export const getState = () => {
 };
 
 export const getBuffering = () => state.buffering;
+export const getCurrentUrl = () => currentUrl;
+export const getBufferingInfo = () => ({
+  isBuffering: state.buffering,
+  lastBufferDurationMs,
+  lastBufferStartMs
+});
 
 const isTimeQueryableState = (s) =>
   s === STATES.PLAYING || s === STATES.PAUSED || s === STATES.READY;

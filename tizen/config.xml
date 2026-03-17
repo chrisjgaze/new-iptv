@@ -2,7 +2,7 @@
 <widget xmlns="http://www.w3.org/ns/widgets"
   xmlns:tizen="http://tizen.org/ns/widgets"
   id="http://yourdomain/Template01"
-  version="0.2.1"
+  version="0.2.2"
   viewmodes="maximized">
 
   <name>CJG Flix</name>

@@ -34,13 +34,13 @@ const Entity = (props) => {
   const columnY = 640;
 
   const Backdrop = {
-    colorTop: '#0E1218',
-    colorBottom: '#1A1F27',
+    colorTop: "#0E1218",
+    colorBottom: "#1A1F27",
     alpha: 0,
     width: 1900,
     height: 1080,
     x: -180,
-    y: columnY,
+    y: columnY
   };
 
   function onRowFocus(this: ElementNode) {
@@ -84,8 +84,12 @@ const Entity = (props) => {
   }
 
   function onEnterTrailer() {
+    console.log("Enter Trailer");
     const streamId = getQueryParam("stream_id");
-    const ext = getQueryParam("ext") || "mkv";
+    const ext = getQueryParam("ext") || "mp4";
+    console.log("Streamid " + streamId);
+    console.log("Ext " + ext);
+
     if (streamId) {
       navigate(`/player/${streamId}?ext=${ext}`);
       return;
@@ -103,9 +107,17 @@ const Entity = (props) => {
    */
   return (
     <Show when={props.data.entity()}>
-      <View x={170} onUp={() => entityActions.setFocus()} onEscape={onEscape}
-        announce={[props.data.entity().heroContent.title, 'PAUSE-1', props.data.entity().heroContent.description]}
-        announceContext="Press LEFT or RIGHT to review items, press UP or DOWN to review categories, press CENTER to select">
+      <View
+        x={170}
+        onUp={() => entityActions.setFocus()}
+        onEscape={onEscape}
+        announce={[
+          props.data.entity().heroContent.title,
+          "PAUSE-1",
+          props.data.entity().heroContent.description
+        ]}
+        announceContext="Press LEFT or RIGHT to review items, press UP or DOWN to review categories, press CENTER to select"
+      >
         <ContentBlock
           y={260}
           marquee={playFocused()}
@@ -121,7 +133,11 @@ const Entity = (props) => {
           onDown={() => columnRef.setFocus()}
           onEnter={onEnterTrailer}
         >
-          <Button width={300} autofocus={props.data.entity()} onFocusChanged={setPlayFocused}>
+          <Button
+            width={300}
+            autofocus={props.data.entity()}
+            onFocusChanged={setPlayFocused}
+          >
             Play
           </Button>
           <Button width={300}>Resume</Button>
@@ -143,7 +159,7 @@ const Entity = (props) => {
             <TileRow
               onFocus={onRowFocus}
               onEnter={onEnter}
-              announce={'Recommendations'}
+              announce={"Recommendations"}
               items={props.data.recommendations()}
               width={1620}
             />
@@ -151,7 +167,7 @@ const Entity = (props) => {
               Cast and Crew
             </Text>
             <TileRow
-              announce={'Cast and Crew'}
+              announce={"Cast and Crew"}
               onFocus={onRowFocusAnimate}
               onEnter={onEnter}
               items={props.data.credits()}
@@ -167,8 +183,8 @@ const Entity = (props) => {
       </View>
       <View
         alpha={backdropAlpha()}
-        colorTop={'#0E1218'}
-        colorBottom={'#1A1F27'}
+        colorTop={"#0E1218"}
+        colorBottom={"#1A1F27"}
         skipFocus
         zIndex={200}
         transition={{ alpha: true }}

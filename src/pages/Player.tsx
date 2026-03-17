@@ -7,7 +7,15 @@ import {
 } from "@lightningtv/solid";
 import { createSignal, onCleanup, onMount } from "solid-js";
 import { setGlobalBackground } from "../state";
-import { init, load, getBuffering, getState } from "../video";
+import {
+  init,
+  load,
+  getBuffering,
+  getState,
+  getCurrentTime,
+  getCurrentUrl,
+  getBufferingInfo
+} from "../video";
 import { useNavigate } from "@solidjs/router";
 import { useParams } from "@solidjs/router";
 
@@ -16,13 +24,32 @@ const Player = () => {
   const navigate = useNavigate();
   const params = useParams();
   const [isReady, setIsReady] = createSignal(false);
+  const [debugState, setDebugState] = createSignal("NONE");
+  const [debugTime, setDebugTime] = createSignal("0:00");
+  const [debugBuffering, setDebugBuffering] = createSignal(false);
+  const [debugLastBufferMs, setDebugLastBufferMs] = createSignal(0);
+  const [debugUrl, setDebugUrl] = createSignal("");
   const [spinnerFrame, setSpinnerFrame] = createSignal("|");
   const streamBase =
     import.meta.env.VITE_STREAM_BASE_URL || "http://YOUR_BASE_URL";
   const streamUser = import.meta.env.VITE_STREAM_USERNAME || "YOUR_USERNAME";
   const streamPass = import.meta.env.VITE_STREAM_PASSWORD || "YOUR_PASSWORD";
-  const urlParams = new URLSearchParams(window.location.search);
-  const ext = urlParams.get("ext") || "mkv";
+  const proxyBase =
+    import.meta.env.VITE_PROXY_BASE_URL || "http://192.168.1.46:8080";
+
+  function getQueryParam(key: string) {
+    const search = window.location.search || "";
+    if (search.includes(key)) {
+      return new URLSearchParams(search).get(key);
+    }
+    const hash = window.location.hash || "";
+    const queryIndex = hash.indexOf("?");
+    if (queryIndex === -1) return null;
+    const hashQuery = hash.slice(queryIndex + 1);
+    return new URLSearchParams(hashQuery).get(key);
+  }
+
+  const ext = getQueryParam("ext") || "mp4";
   const OverviewContainer = {
     width: 900,
     height: 500,
@@ -131,9 +158,10 @@ const Player = () => {
     await init(parent);
     const streamId = params.id;
     const streamUrl = `${streamBase}/movie/${streamUser}/${streamPass}/${streamId}.${ext}`;
-    const newUrl = "http://192.168.1.46:8080/p/?u=" + streamUrl;
-    console.log("Playing stream URL:", newUrl);
-    load({ streamUrl });
+    //const proxyUrl = `${proxyBase}/p/?u=${encodeURIComponent(streamUrl)}`;
+    const proxyUrl = `${streamUrl}`;
+    console.log("Playing stream URL:", proxyUrl);
+    load({ streamUrl: proxyUrl });
   });
 
   const stateTimer = setInterval(() => {
@@ -141,6 +169,19 @@ const Player = () => {
     const ready = state ? READY_STATES.has(state) : false;
     const buffering = getBuffering?.() || false;
     setIsReady(ready && !buffering);
+    setDebugState(state || "NONE");
+    setDebugBuffering(buffering);
+    setDebugUrl(getCurrentUrl?.() || "");
+    const timeSec = getCurrentTime?.() || 0;
+    const mins = Math.floor(timeSec / 60);
+    const secs = Math.floor(timeSec % 60)
+      .toString()
+      .padStart(2, "0");
+    setDebugTime(`${mins}:${secs}`);
+    const bufInfo = getBufferingInfo?.();
+    if (bufInfo?.lastBufferDurationMs != null) {
+      setDebugLastBufferMs(bufInfo.lastBufferDurationMs);
+    }
   }, 300);
 
   const frames = ["|", "/", "-", "\\"];
@@ -170,6 +211,17 @@ const Player = () => {
           </Text>
         </View>
       )}
+      <View x={40} y={40} width={1840} height={200} color={0x00000000}>
+        <Text fontSize={24}>
+          {`State: ${debugState()}  Buffering: ${debugBuffering()}`}
+        </Text>
+        <Text y={30} fontSize={24}>
+          {`Time: ${debugTime()}  Last buffer: ${debugLastBufferMs()} ms`}
+        </Text>
+        <Text y={60} fontSize={22}>
+          {`--URL: ${debugUrl()}`}
+        </Text>
+      </View>
     </View>
   );
 };
