@@ -10,11 +10,16 @@ import { setGlobalBackground } from "../state";
 import {
   init,
   load,
+  play,
+  pause,
+  seekTo,
+  destroy,
   getBuffering,
   getState,
   getCurrentTime,
   getCurrentUrl,
-  getBufferingInfo
+  getBufferingInfo,
+  getVideoDuration
 } from "../video";
 import { useNavigate } from "@solidjs/router";
 import { useParams } from "@solidjs/router";
@@ -30,6 +35,9 @@ const Player = () => {
   const [debugLastBufferMs, setDebugLastBufferMs] = createSignal(0);
   const [debugUrl, setDebugUrl] = createSignal("");
   const [spinnerFrame, setSpinnerFrame] = createSignal("|");
+  const [currentTimeSec, setCurrentTimeSec] = createSignal(0);
+  const [durationSec, setDurationSec] = createSignal(0);
+  const [controlsVisible, setControlsVisible] = createSignal(true);
   const streamBase =
     import.meta.env.VITE_STREAM_BASE_URL || "http://YOUR_BASE_URL";
   const streamUser = import.meta.env.VITE_STREAM_USERNAME || "YOUR_USERNAME";
@@ -151,6 +159,66 @@ const Player = () => {
   };
 
   const READY_STATES = new Set(["READY", "PLAYING", "PAUSED"]);
+  const SEEK_STEP_SECONDS = 15;
+  let controlsHideTimer;
+
+  function formatTime(totalSeconds: number) {
+    const safe = Math.max(0, Math.floor(totalSeconds || 0));
+    const hours = Math.floor(safe / 3600);
+    const mins = Math.floor((safe % 3600) / 60);
+    const secs = safe % 60;
+    if (hours > 0) {
+      return `${hours}:${mins.toString().padStart(2, "0")}:${secs
+        .toString()
+        .padStart(2, "0")}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  }
+
+  function scheduleControlsHide() {
+    if (controlsHideTimer) clearTimeout(controlsHideTimer);
+    controlsHideTimer = window.setTimeout(() => {
+      if (!debugBuffering()) {
+        setControlsVisible(false);
+      }
+    }, 4500);
+  }
+
+  function revealControls() {
+    setControlsVisible(true);
+    scheduleControlsHide();
+  }
+
+  function togglePlayPause() {
+    revealControls();
+    if (debugState() === "PAUSED") {
+      play();
+      return true;
+    }
+    if (debugState() === "PLAYING" || debugState() === "READY") {
+      pause();
+      return true;
+    }
+    return false;
+  }
+
+  function seekBy(deltaSeconds: number) {
+    revealControls();
+    const duration = durationSec();
+    if (!duration) return false;
+    const nextTime = Math.max(
+      0,
+      Math.min(currentTimeSec() + deltaSeconds, duration)
+    );
+    seekTo(nextTime);
+    return true;
+  }
+
+  async function exitPlayer() {
+    await destroy();
+    navigate(-1);
+    return true;
+  }
 
   onMount(async () => {
     setGlobalBackground("#000000");
@@ -173,14 +241,15 @@ const Player = () => {
     setDebugBuffering(buffering);
     setDebugUrl(getCurrentUrl?.() || "");
     const timeSec = getCurrentTime?.() || 0;
-    const mins = Math.floor(timeSec / 60);
-    const secs = Math.floor(timeSec % 60)
-      .toString()
-      .padStart(2, "0");
-    setDebugTime(`${mins}:${secs}`);
+    setCurrentTimeSec(timeSec);
+    setDebugTime(formatTime(timeSec));
+    setDurationSec(getVideoDuration?.() || 0);
     const bufInfo = getBufferingInfo?.();
     if (bufInfo?.lastBufferDurationMs != null) {
       setDebugLastBufferMs(bufInfo.lastBufferDurationMs);
+    }
+    if (buffering) {
+      setControlsVisible(true);
     }
   }, 300);
 
@@ -194,10 +263,21 @@ const Player = () => {
   onCleanup(() => {
     clearInterval(stateTimer);
     clearInterval(spinnerTimer);
+    if (controlsHideTimer) clearTimeout(controlsHideTimer);
   });
 
+  const progressWidth = 1240;
+
   return (
-    <View autofocus onBack={() => navigate(-1)}>
+    <View
+      autofocus
+      onBack={exitPlayer}
+      onEnter={togglePlayPause}
+      onUp={revealControls}
+      onDown={revealControls}
+      onLeft={() => seekBy(-SEEK_STEP_SECONDS)}
+      onRight={() => seekBy(SEEK_STEP_SECONDS)}
+    >
       {!isReady() && (
         <View x={0} y={0} width={1920} height={1080} color={0x000000cc}>
           <Text
@@ -211,15 +291,64 @@ const Player = () => {
           </Text>
         </View>
       )}
-      <View x={40} y={40} width={1840} height={200} color={0x00000000}>
+      {controlsVisible() && (
+        <View x={80} y={860} width={1760} height={170} color={0x101820e6}>
+          <Text x={40} y={24} fontSize={32} fontWeight="bold">
+            {debugState() === "PAUSED" ? "Paused" : "Playing"}
+          </Text>
+          <Text x={250} y={28} fontSize={22}>
+            {`Left/Right seek ${SEEK_STEP_SECONDS}s`}
+          </Text>
+          <Text x={520} y={28} fontSize={22}>
+            {`Enter ${debugState() === "PAUSED" ? "Play" : "Pause"}`}
+          </Text>
+          <Text x={40} y={74} fontSize={24}>
+            {debugTime()}
+          </Text>
+          <Text x={1600} y={74} fontSize={24}>
+            {formatTime(durationSec())}
+          </Text>
+          <View x={40} y={118} width={progressWidth} height={12} color={0x49515cff}>
+            <View
+              width={Math.max(
+                0,
+                Math.min(
+                  progressWidth,
+                  durationSec()
+                    ? Math.round((currentTimeSec() / durationSec()) * progressWidth)
+                    : 0
+                )
+              )}
+              height={12}
+              color={0xf0cb00ff}
+            />
+          </View>
+          <View
+            x={
+              40 +
+              Math.max(
+                0,
+                Math.min(
+                  progressWidth - 10,
+                  durationSec()
+                    ? Math.round((currentTimeSec() / durationSec()) * progressWidth) - 5
+                    : 0
+                )
+              )
+            }
+            y={110}
+            width={20}
+            height={28}
+            color={0xffffffff}
+          />
+          <Text x={40} y={142} fontSize={20}>
+            {`Buffering: ${debugBuffering()}  Last buffer: ${debugLastBufferMs()} ms`}
+          </Text>
+        </View>
+      )}
+      <View x={40} y={40} width={1840} height={96} color={0x00000000}>
         <Text fontSize={24}>
-          {`State: ${debugState()}  Buffering: ${debugBuffering()}`}
-        </Text>
-        <Text y={30} fontSize={24}>
-          {`Time: ${debugTime()}  Last buffer: ${debugLastBufferMs()} ms`}
-        </Text>
-        <Text y={60} fontSize={22}>
-          {`--URL: ${debugUrl()}`}
+          {`State: ${debugState()}  URL: ${debugUrl()}`}
         </Text>
       </View>
     </View>

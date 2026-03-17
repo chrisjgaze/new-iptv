@@ -198,6 +198,27 @@ export const getVideoDuration = () => {
   }
 };
 
+export const seekTo = (seconds) => {
+  if (!window.webapis || !webapis.avplay) return;
+  const s = getState();
+  if (!isTimeQueryableState(s)) return;
+  try {
+    const durationMs = webapis.avplay.getDuration();
+    const targetMs = Math.max(0, Math.min(seconds * 1000, durationMs || 0));
+    webapis.avplay.seekTo(
+      targetMs,
+      () => {
+        console.log("AVPlay seekTo:", targetMs);
+      },
+      (err) => {
+        console.error("AVPlay seekTo failed:", err);
+      }
+    );
+  } catch (e) {
+    console.error("AVPlay seekTo Exception:", e);
+  }
+};
+
 export const getTimeFormat = () => {
   const curr = getCurrentTime();
   const dur = getVideoDuration();
@@ -213,6 +234,7 @@ export default {
   pause,
   getCurrentTime,
   getVideoDuration,
+  seekTo,
   getTimeFormat,
   getState,
   getBuffering,
