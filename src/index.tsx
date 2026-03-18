@@ -119,6 +119,34 @@ if (rendererMode === "canvas") {
   Config.rendererOptions.renderEngine = WebGlCoreRenderer;
 }
 
+function registerTizenRemoteKeys() {
+  const tizenApi = (window as any).tizen?.tvinputdevice;
+  if (!tizenApi) return;
+  const supportedKeys = typeof tizenApi.getSupportedKeys === "function"
+    ? tizenApi.getSupportedKeys()
+    : [];
+  console.log("Tizen supported keys:", supportedKeys);
+
+  const numericKeys = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+  const supportedDigitLikeKeys = supportedKeys
+    .map((entry) => entry?.name)
+    .filter((name) => typeof name === "string" && /(^\d$|Digit\d|Numpad\d)/.test(name));
+  const keysToRegister = Array.from(
+    new Set([...numericKeys, ...supportedDigitLikeKeys])
+  );
+
+  for (const key of keysToRegister) {
+    try {
+      tizenApi.registerKey(key);
+      console.log(`Registered Tizen key: ${key}`);
+    } catch (error) {
+      console.warn(`Failed to register Tizen key: ${key}`, error);
+    }
+  }
+}
+
+registerTizenRemoteKeys();
+
 const { renderer, render } = createRenderer();
 loadFonts(fonts);
 

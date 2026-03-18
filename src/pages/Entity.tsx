@@ -15,7 +15,6 @@ import ContentBlock from "../components/ContentBlock";
 import { useNavigate } from "@solidjs/router";
 import styles from "../styles";
 //import * as player from "../video";
-
 const Entity = (props) => {
   const [backdropAlpha, setBackdropAlpha] = createSignal(0);
   const [playFocused, setPlayFocused] = createSignal(false);
