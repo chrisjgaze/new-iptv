@@ -150,7 +150,7 @@ export default function NavDrawer(props) {
           Series
         </NavButton>
         <NavButton
-          icon="tv"
+          icon="search"
           iconColor={"#fff"}
           announce={["Search", "button"]}
           onEnter={() => handleNavigate("/search")}
