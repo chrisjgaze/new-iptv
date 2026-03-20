@@ -512,26 +512,30 @@ const Player = () => {
           </Text>
         </View>
       )}
-      <View x={40} y={40} width={1840} height={96} color={0x00000000}>
-        <Text fontSize={24}>
-          {`State: ${debugState()}  URL: ${debugUrl()}`}
-        </Text>
-      </View>
-      {debugError() && (
-        <View x={40} y={120} width={1840} height={120} color={0x5a0000dd}>
-          <Text x={20} y={20} width={1800} fontSize={22} contain="width">
-            {`Error: ${debugError()}`}
-          </Text>
-        </View>
+      {controlsVisible() && (
+        <>
+          <View x={40} y={40} width={1840} height={96} color={0x00000000}>
+            <Text fontSize={24}>
+              {`State: ${debugState()}  URL: ${debugUrl()}`}
+            </Text>
+          </View>
+          {debugError() && (
+            <View x={40} y={120} width={1840} height={120} color={0x5a0000dd}>
+              <Text x={20} y={20} width={1800} fontSize={22} contain="width">
+                {`Error: ${debugError()}`}
+              </Text>
+            </View>
+          )}
+          <View x={40} y={250} width={900} height={150} color={0x00000088}>
+            <Text x={20} y={16} fontSize={22}>
+              AVPlay events
+            </Text>
+            <Text x={20} y={48} width={860} fontSize={18} contain="width">
+              {debugEvents().join(" | ")}
+            </Text>
+          </View>
+        </>
       )}
-      <View x={40} y={250} width={900} height={150} color={0x00000088}>
-        <Text x={20} y={16} fontSize={22}>
-          AVPlay events
-        </Text>
-        <Text x={20} y={48} width={860} fontSize={18} contain="width">
-          {debugEvents().join(" | ")}
-        </Text>
-      </View>
     </View>
   );
 };
