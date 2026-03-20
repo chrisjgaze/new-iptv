@@ -35,6 +35,7 @@ const Browse = (props) => {
   let vgRef;
   const location = useLocation();
   const isCategoriesList = () => location.pathname === "/categories";
+  const isSeriesCategoriesList = () => location.pathname === "/series";
   const isCategoryMovies = useMatch(() => "/categories/:id");
 
   const isCategoryRoute = useMatch(() => "/categories/*all");
@@ -56,6 +57,7 @@ const Browse = (props) => {
   const [debugPlotUrl, setDebugPlotUrl] = createSignal("");
   const [debugCount, setDebugCount] = createSignal(0);
   const [bgDebugLine, setBgDebugLine] = createSignal("");
+  const [navDebugLine, setNavDebugLine] = createSignal("");
   const plotCache = new Map<string, string>();
   const plotInFlight = new Map<string, Promise<string>>();
   const backdropCache = new Map<string, string>();
@@ -316,8 +318,11 @@ const Browse = (props) => {
       });
       return;
     }
-    if (isCategoriesList() && item.title) {
-      setHero({ title: item.title, description: "Category" });
+    if ((isCategoriesList() || isSeriesCategoriesList()) && item.title) {
+      setHero({
+        title: item.title,
+        description: isSeriesCategoriesList() ? "Series category" : "Category"
+      });
     }
   }
 
@@ -355,16 +360,24 @@ const Browse = (props) => {
     provider().setPage((p) => p + 1);
   }
 
+  function navigateToItem(item: any) {
+    if (!item?.href) {
+      const message = `No href for selected item: ${item?.title || "unknown"}`;
+      console.warn(message, item);
+      setNavDebugLine(message);
+      return true;
+    }
+    setNavDebugLine(`navigate=${item.href}`);
+    navigate(item.href);
+    return true;
+  }
+
   function onEnter(this: ElementNode) {
     this.display = "flex";
     let entity = this.children.find((c) =>
       c.states!.has("focus")
     ) as ElementNode;
-    if (!entity?.item?.href) {
-      return true;
-    }
-    navigate(entity.item.href);
-    return true;
+    return navigateToItem(entity?.item);
   }
 
   createEffect(() => {
@@ -414,6 +427,16 @@ const Browse = (props) => {
           >
             {bgDebugLine()}
           </Text>
+          <Text
+            x={162}
+            y={380}
+            width={1400}
+            contain="width"
+            fontSize={18}
+            color={hexColor("66ffcc")}
+          >
+            {navDebugLine()}
+          </Text>
         </>
       )}
       <View clipping style={styles.itemsContainer}>
@@ -428,7 +451,9 @@ const Browse = (props) => {
               ? `All Trending ${props.params.filter}`
               : isCategoriesList()
                 ? "Categories"
-                : isCategoryMovies()
+                : isSeriesCategoriesList()
+                  ? "Series Categories"
+                  : isCategoryMovies()
                   ? "Category Movies"
                   : "Browse"
           }
@@ -446,7 +471,7 @@ const Browse = (props) => {
         >
           {(item) => {
             const current = item();
-            if (isCategoriesList()) {
+            if (isCategoriesList() || isSeriesCategoriesList()) {
               return (
                 <View
                   style={styles.Thumbnail}
@@ -456,6 +481,7 @@ const Browse = (props) => {
                   justifyContent="center"
                   alignItems="center"
                   item={current}
+                  onEnter={() => navigateToItem(current)}
                 >
                   <Text
                     width={170}
@@ -469,7 +495,7 @@ const Browse = (props) => {
                 </View>
               );
             }
-            return <Thumbnail item={current} />;
+            return <Thumbnail item={current} onEnter={() => navigateToItem(current)} />;
           }}
         </VirtualGrid>
       </View>

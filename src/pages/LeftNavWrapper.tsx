@@ -46,7 +46,7 @@ const LeftNavWrapper = (props) => {
 
   const [showWidgets, setShowWidgets] = createSignal(true);
   const location = useLocation();
-  const showOnPaths = ["/browse", "/entity", "/categories"];
+  const showOnPaths = ["/browse", "/entity", "/categories", "/search", "/series"];
   createEffect(() => {
     const currentPath = location.pathname;
     let matchesPartial = showOnPaths.some((path) =>
@@ -60,8 +60,28 @@ const LeftNavWrapper = (props) => {
 
   const [lastKey, setLastKey] = createSignal<string | undefined>();
   const [lastError, setLastError] = createSignal<string | undefined>();
+  const [showFpsCounter, setShowFpsCounter] = createSignal(false);
+  let fpsCodeBuffer = "";
   const keyPressHandler = (e) => {
-    setLastKey(`Last key: ${e.key}, Code: ${e.keyCode}`);
+    const keyLabel = `Last key: ${e.key}, Code: ${e.keyCode}`;
+    setLastKey(keyLabel);
+
+    const digit = typeof e.key === "string" && /^\d$/.test(e.key)
+      ? e.key
+      : typeof e.keyCode === "number" && e.keyCode >= 48 && e.keyCode <= 57
+        ? String(e.keyCode - 48)
+        : "";
+
+    if (!digit) {
+      fpsCodeBuffer = "";
+      return;
+    }
+
+    fpsCodeBuffer = `${fpsCodeBuffer}${digit}`.slice(-4);
+    if (fpsCodeBuffer === "1234") {
+      setShowFpsCounter((visible) => !visible);
+      fpsCodeBuffer = "";
+    }
   };
   document.addEventListener("keydown", keyPressHandler);
   const displayError = (e) => {
@@ -91,7 +111,7 @@ const LeftNavWrapper = (props) => {
       }
     >
       <Background />
-      <FPSCounter mountX={1} x={1910} y={10} alpha={showWidgets() ? 1 : 0} />
+      <FPSCounter mountX={1} x={1910} y={10} alpha={showWidgets() && showFpsCounter() ? 1 : 0} />
       <View
         mountX={1}
         width={330}
@@ -99,7 +119,7 @@ const LeftNavWrapper = (props) => {
         x={1910}
         y={190}
         color={0x000000ff}
-        hidden={!showWidgets()}
+        hidden={!(showWidgets() && showFpsCounter())}
       >
         <Text fontSize={20} y={4} x={4}>
           {lastKey()}

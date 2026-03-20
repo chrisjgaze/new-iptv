@@ -21,6 +21,7 @@ import {
   getCurrentUrl,
   getBufferingInfo,
   getVideoDuration,
+  getBackend,
   getLastError,
   getDebugEvents
 } from "../video";
@@ -33,6 +34,7 @@ const Player = () => {
   const params = useParams();
   const [isReady, setIsReady] = createSignal(false);
   const [debugState, setDebugState] = createSignal("NONE");
+  const [debugBackend, setDebugBackend] = createSignal("none");
   const [debugTime, setDebugTime] = createSignal("0:00");
   const [debugBuffering, setDebugBuffering] = createSignal(false);
   const [debugPreparing, setDebugPreparing] = createSignal(false);
@@ -373,6 +375,7 @@ const Player = () => {
     const lastError = getLastError?.();
     setIsReady(ready && !buffering);
     setDebugState(state || "NONE");
+    setDebugBackend(getBackend?.() || "none");
     setDebugBuffering(buffering);
     setDebugPreparing(preparing);
     setDebugUrl(getCurrentUrl?.() || "");
@@ -447,7 +450,7 @@ const Player = () => {
             {debugState() === "PAUSED" ? "Paused" : "Playing"}
           </Text>
           <Text x={250} y={28} fontSize={22}>
-            {`Left/Right seek ${SEEK_STEP_SECONDS}s`}
+            {`Backend ${debugBackend()}  Left/Right seek ${SEEK_STEP_SECONDS}s`}
           </Text>
           <Text x={520} y={28} fontSize={22}>
             {`Enter ${debugState() === "PAUSED" ? "Play" : "Pause"}`}

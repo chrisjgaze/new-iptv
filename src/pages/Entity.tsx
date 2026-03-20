@@ -18,6 +18,7 @@ import styles from "../styles";
 const Entity = (props) => {
   const [backdropAlpha, setBackdropAlpha] = createSignal(0);
   const [playFocused, setPlayFocused] = createSignal(false);
+  const [playMessage, setPlayMessage] = createSignal("");
   const navigate = useNavigate();
 
   createEffect(
@@ -84,6 +85,7 @@ const Entity = (props) => {
 
   function onEnterTrailer() {
     console.log("Enter Trailer");
+    setPlayMessage("");
     const streamId = getQueryParam("stream_id");
     const ext = getQueryParam("ext") || "mp4";
     console.log("Streamid " + streamId);
@@ -93,7 +95,14 @@ const Entity = (props) => {
       navigate(`/player/${streamId}?ext=${ext}`);
       return;
     }
-    // fallback: no stream available
+
+    const message = "No stream_id found on entity route";
+    console.warn(message, {
+      href: window.location.href,
+      hash: window.location.hash,
+      search: window.location.search
+    });
+    setPlayMessage(message);
   }
 
   let columnRef, backdropRef, entityActions;
@@ -130,17 +139,23 @@ const Entity = (props) => {
           width={640}
           gap={40}
           onDown={() => columnRef.setFocus()}
-          onEnter={onEnterTrailer}
         >
           <Button
             width={300}
             autofocus={props.data.entity()}
             onFocusChanged={setPlayFocused}
+            onEnter={onEnterTrailer}
           >
             Play
           </Button>
           <Button width={300}>Resume</Button>
         </Row>
+
+        <Show when={playMessage()}>
+          <Text x={170} y={610} fontSize={24} color="#ffcc66">
+            {playMessage()}
+          </Text>
+        </Show>
 
         <Column
           ref={columnRef}

@@ -72,7 +72,10 @@ export default function NavDrawer(props) {
     if (useMatch(() => "/browse/tv")()) index = 2;
     if (useMatch(() => "/categories")() || useMatch(() => "/categories/:id")())
       index = 3;
-    if (useMatch(() => "/examples")()) index = 4;
+    if (useMatch(() => "/series")() || useMatch(() => "/series/:id")() || useMatch(() => "/series/show/:id")())
+      index = 4;
+    if (useMatch(() => "/search")()) index = 5;
+    if (useMatch(() => "/examples")()) index = 6;
     return base + step * index;
   });
 
@@ -131,12 +134,28 @@ export default function NavDrawer(props) {
           TV
         </NavButton>
         <NavButton
-          icon="series"
+          icon="movie"
           iconColor={"#fff"}
-          announce={["Categories", "button"]}
+          announce={["My Movies", "button"]}
           onEnter={() => handleNavigate("/categories")}
         >
+          My Movies
+        </NavButton>
+        <NavButton
+          icon="series"
+          iconColor={"#fff"}
+          announce={["Series", "button"]}
+          onEnter={() => handleNavigate("/series")}
+        >
           Series
+        </NavButton>
+        <NavButton
+          icon="tv"
+          iconColor={"#fff"}
+          announce={["Search", "button"]}
+          onEnter={() => handleNavigate("/search")}
+        >
+          Search
         </NavButton>
         <NavButton
           icon="experiment"

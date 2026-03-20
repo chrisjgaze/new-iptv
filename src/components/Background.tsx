@@ -8,6 +8,14 @@ import {
 import { createEffect, on, onMount } from "solid-js";
 import theme from "theme";
 
+function isCategoryScreen() {
+  const hash = window.location.hash || "";
+  return (
+    hash.startsWith("#/categories") ||
+    hash.startsWith("#/series")
+  );
+}
+
 export default function Background() {
   const params = new URLSearchParams(window.location.search);
   const disableBG = params.get("disableBG") === "true";
@@ -20,8 +28,17 @@ export default function Background() {
     easing: "ease-in-out"
   } satisfies Partial<AnimationSettings>;
   const bgStyles = {
+    width: 1920,
+    height: 1080,
     alpha,
-    color: 0xffffffff
+    color: 0xffffffff,
+    textureOptions: {
+      resizeMode: {
+        type: "cover",
+        clipX: 0.5,
+        clipY: 0.5
+      }
+    }
   } satisfies IntrinsicNodeStyleProps;
 
   onMount(() => {
@@ -47,7 +64,7 @@ export default function Background() {
       bg1.alpha = 1;
       active = 1;
       bg2.alpha = 0;
-      heroMask.alpha = 0;
+      heroMask.alpha = isCategoryScreen() ? 1 : 0;
       return;
     } else {
       bg1.color = 0xffffffff;

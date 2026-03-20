@@ -8,11 +8,14 @@ let lastBufferDurationMs = 0;
 let lastError = null;
 const debugEvents = [];
 let transitionLock = Promise.resolve();
+let backend = "none";
+let debugOverlay = null;
 
 export const state = {
   playingState: false,
   buffering: false,
-  preparing: false
+  preparing: false,
+  waitingForGesture: false
 };
 
 // Map AVPlay states to your app state
@@ -28,6 +31,60 @@ const isActiveState = (state) =>
   state === STATES.PLAYING ||
   state === STATES.PAUSED;
 
+const isTizenBackend = () => Boolean(window.webapis && window.webapis.avplay);
+
+const ensureHtml5DebugOverlay = () => {
+  if (debugOverlay) return debugOverlay;
+  debugOverlay = document.getElementById("html5-debug-overlay");
+  if (debugOverlay) return debugOverlay;
+
+  debugOverlay = document.createElement("div");
+  debugOverlay.id = "html5-debug-overlay";
+  debugOverlay.style.cssText = [
+    "position:fixed",
+    "left:16px",
+    "top:16px",
+    "right:16px",
+    "z-index:2000",
+    "padding:12px 16px",
+    "background:rgba(0,0,0,0.78)",
+    "color:#ffffff",
+    "font:16px/1.4 monospace",
+    "white-space:pre-wrap",
+    "pointer-events:none",
+    "border:1px solid rgba(255,255,255,0.25)"
+  ].join(";");
+  document.body.appendChild(debugOverlay);
+  return debugOverlay;
+};
+
+const updateHtml5DebugOverlay = () => {
+  if (backend !== "html5") return;
+  const overlay = ensureHtml5DebugOverlay();
+  const stateLabel = !videoElement || !currentUrl
+    ? "NONE"
+    : state.preparing
+      ? "PREPARING"
+      : state.buffering
+        ? "BUFFERING"
+        : videoElement.ended
+          ? "ENDED"
+          : videoElement.paused
+            ? videoElement.currentTime > 0
+              ? "PAUSED"
+              : "READY"
+            : "PLAYING";
+  const lines = [
+    `Backend: ${backend}`,
+    `State: ${stateLabel}`,
+    `URL: ${currentUrl || ""}`,
+    `Error: ${lastError ? lastError.message : ""}`
+  ];
+  overlay.textContent = lines.join("\n");
+  document.title = `[${stateLabel}] ${currentUrl || "no-url"}`;
+};
+
+
 const resetPlaybackState = () => {
   currentUrl = null;
   lastBufferStartMs = null;
@@ -36,6 +93,8 @@ const resetPlaybackState = () => {
   state.playingState = false;
   state.buffering = false;
   state.preparing = false;
+  state.waitingForGesture = false;
+  if (debugOverlay) debugOverlay.textContent = "";
 };
 
 const pushDebugEvent = (message, details) => {
@@ -48,6 +107,7 @@ const pushDebugEvent = (message, details) => {
   if (debugEvents.length > 40) debugEvents.shift();
   if (details === undefined) console.log(`[AVPlay] ${message}`);
   else console.log(`[AVPlay] ${message}`, details);
+  updateHtml5DebugOverlay();
   return entry;
 };
 
@@ -59,6 +119,7 @@ const setLastError = (message, details) => {
   };
   if (details === undefined) console.error(`[AVPlay] ${message}`);
   else console.error(`[AVPlay] ${message}`, details);
+  updateHtml5DebugOverlay();
 };
 
 const sleep = (ms) =>
@@ -103,55 +164,192 @@ const runExclusiveTransition = async (label, fn) => {
 };
 
 export const init = (element) => {
-  // We use the ID to let AVPlay know where to "punch the hole"
-  const existingElement = document.getElementById("av-player");
-  videoElement = element || existingElement;
+  backend = isTizenBackend() ? "tizen" : "html5";
+  const playerId = backend === "tizen" ? "av-player" : "html5-player";
+  const existingElement = document.getElementById(playerId);
+  videoElement = existingElement;
   pushDebugEvent("init", {
+    backend,
     hasElement: !!element,
-    reusedExisting: !!existingElement && !element
+    reusedExisting: !!existingElement
   });
 
-  if (!videoElement) {
-    videoElement = document.createElement("div");
-    videoElement.id = "av-player";
-    videoElement.style.cssText =
-      "position: absolute; top: 0; left: 0; width: 1px; height: 1px; z-index: -1;";
-    document.body.insertBefore(videoElement, document.body.firstChild);
-    pushDebugEvent("created av-player element");
-  } else {
-    videoElement.id = "av-player";
-    videoElement.style.cssText =
-      "position: absolute; top: 0; left: 0; width: 1px; height: 1px; z-index: -1;";
-  }
-
-  const duplicatePlayers = document.querySelectorAll("#av-player");
-  if (duplicatePlayers.length > 1) {
-    pushDebugEvent("removing duplicate av-player elements", {
-      count: duplicatePlayers.length
-    });
-    for (let index = duplicatePlayers.length - 1; index >= 1; index -= 1) {
-      const node = duplicatePlayers[index];
-      if (node.parentNode) {
-        node.parentNode.removeChild(node);
-      }
+  if (backend === "tizen") {
+    videoElement = element || existingElement;
+    if (!videoElement) {
+      videoElement = document.createElement("div");
+      videoElement.id = "av-player";
+      videoElement.style.cssText =
+        "position: absolute; top: 0; left: 0; width: 1px; height: 1px; z-index: -1;";
+      document.body.insertBefore(videoElement, document.body.firstChild);
+      pushDebugEvent("created av-player element");
+    } else {
+      videoElement.id = "av-player";
+      videoElement.style.cssText =
+        "position: absolute; top: 0; left: 0; width: 1px; height: 1px; z-index: -1;";
     }
-    videoElement = document.getElementById("av-player");
+
+    const duplicatePlayers = document.querySelectorAll("#av-player");
+    if (duplicatePlayers.length > 1) {
+      pushDebugEvent("removing duplicate av-player elements", {
+        count: duplicatePlayers.length
+      });
+      for (let index = duplicatePlayers.length - 1; index >= 1; index -= 1) {
+        const node = duplicatePlayers[index];
+        if (node.parentNode) {
+          node.parentNode.removeChild(node);
+        }
+      }
+      videoElement = document.getElementById("av-player");
+    }
+  } else {
+    if (!videoElement) {
+      videoElement = document.createElement("video");
+      videoElement.id = "html5-player";
+      videoElement.setAttribute("playsinline", "true");
+      videoElement.setAttribute("webkit-playsinline", "true");
+      videoElement.controls = false;
+      videoElement.autoplay = false;
+      videoElement.preload = "auto";
+      videoElement.disablePictureInPicture = true;
+      videoElement.style.cssText =
+        "position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; object-fit: contain; z-index: 1000;";
+      document.body.appendChild(videoElement);
+      pushDebugEvent("created html5 player element");
+    } else {
+      videoElement.style.display = "block";
+    }
+    ensureHtml5DebugOverlay();
+    updateHtml5DebugOverlay();
   }
 
   pushDebugEvent("init complete", {
+    backend,
     hasVideoElement: !!videoElement
   });
 };
 
 export const load = async (config) => {
   return runExclusiveTransition("load", async () => {
-    if (!window.webapis || !window.webapis.avplay) {
-      setLastError("AVPlay API not found. Are you on a Tizen TV?");
-      return;
-    }
-
     const loadStartedAt = Date.now();
     state.preparing = true;
+
+    if (!isTizenBackend()) {
+      try {
+        if (!videoElement) init();
+        currentUrl = config.streamUrl;
+        state.waitingForGesture = false;
+        videoElement.pause();
+        videoElement.removeAttribute("src");
+        videoElement.load();
+        videoElement.src = currentUrl;
+        videoElement.currentTime = 0;
+        videoElement.onloadstart = () => {
+          pushDebugEvent("html5 loadstart", { url: currentUrl });
+        };
+        videoElement.onloadedmetadata = () => {
+          pushDebugEvent("html5 loadedmetadata", {
+            duration: videoElement.duration,
+            readyState: videoElement.readyState
+          });
+        };
+        videoElement.oncanplay = () => {
+          pushDebugEvent("html5 canplay", {
+            readyState: videoElement.readyState
+          });
+        };
+        videoElement.onwaiting = () => {
+          state.buffering = true;
+          pushDebugEvent("html5 buffering start");
+        };
+        videoElement.onplaying = () => {
+          state.preparing = false;
+          state.buffering = false;
+          state.playingState = true;
+          state.waitingForGesture = false;
+          updateHtml5DebugOverlay();
+          pushDebugEvent("html5 playing");
+        };
+        videoElement.onpause = () => {
+          state.playingState = false;
+          updateHtml5DebugOverlay();
+          pushDebugEvent("html5 paused");
+        };
+        videoElement.onended = () => {
+          state.playingState = false;
+          updateHtml5DebugOverlay();
+          pushDebugEvent("html5 ended");
+        };
+        videoElement.onstalled = () => {
+          pushDebugEvent("html5 stalled", {
+            networkState: videoElement.networkState,
+            readyState: videoElement.readyState
+          });
+        };
+        videoElement.onerror = () => {
+          state.preparing = false;
+          state.buffering = false;
+          const mediaError = videoElement.error;
+          const errorDetails = {
+            code: mediaError?.code,
+            message: mediaError?.message || mediaError,
+            networkState: videoElement.networkState,
+            readyState: videoElement.readyState,
+            canPlayType: {
+              mp4: videoElement.canPlayType('video/mp4'),
+              hls: videoElement.canPlayType('application/vnd.apple.mpegurl'),
+              mkv: videoElement.canPlayType('video/x-matroska')
+            }
+          };
+          setLastError("HTML5 video error", errorDetails);
+        };
+
+        videoElement.load();
+
+        await new Promise((resolve, reject) => {
+          const onLoaded = () => {
+            videoElement.removeEventListener("loadedmetadata", onLoaded);
+            videoElement.removeEventListener("error", onError);
+            resolve();
+          };
+          const onError = () => {
+            videoElement.removeEventListener("loadedmetadata", onLoaded);
+            videoElement.removeEventListener("error", onError);
+            reject(new Error("HTML5 video failed to load metadata"));
+          };
+          videoElement.addEventListener("loadedmetadata", onLoaded);
+          videoElement.addEventListener("error", onError);
+        });
+
+        state.preparing = false;
+        updateHtml5DebugOverlay();
+        pushDebugEvent("html5 load success", {
+          elapsedMs: Date.now() - loadStartedAt,
+          url: currentUrl
+        });
+        const playPromise = videoElement.play();
+        updateHtml5DebugOverlay();
+        if (playPromise?.catch) {
+          playPromise.catch((error) => {
+            state.playingState = false;
+            state.waitingForGesture = error?.name === "NotAllowedError";
+            if (state.waitingForGesture) {
+              setLastError(
+                "HTML5 autoplay blocked. Launch Chromium with --autoplay-policy=no-user-gesture-required or start playback with a user gesture.",
+                error
+              );
+              return;
+            }
+            setLastError("HTML5 play failed", error);
+          });
+        }
+        return;
+      } catch (e) {
+        state.preparing = false;
+        setLastError("HTML5 load exception", e);
+        return;
+      }
+    }
 
     try {
       try {
@@ -285,6 +483,20 @@ export const load = async (config) => {
 };
 
 export const play = () => {
+  if (!isTizenBackend()) {
+    if (!videoElement) return;
+    pushDebugEvent("html5 play()", { currentUrl });
+    const playPromise = videoElement.play();
+    state.playingState = true;
+    if (playPromise?.catch) {
+      playPromise.catch((error) => {
+        state.playingState = false;
+        setLastError("HTML5 play exception", error);
+      });
+    }
+    return;
+  }
+
   if (window.webapis && webapis.avplay) {
     try {
       pushDebugEvent("play()", { stateBefore: getState() });
@@ -298,6 +510,15 @@ export const play = () => {
 };
 
 export const pause = () => {
+  if (!isTizenBackend()) {
+    if (!videoElement) return;
+    videoElement.pause();
+    state.playingState = false;
+    updateHtml5DebugOverlay();
+    pushDebugEvent("html5 pause()");
+    return;
+  }
+
   if (window.webapis && webapis.avplay) {
     try {
       pushDebugEvent("pause()", { stateBefore: getState() });
@@ -311,6 +532,28 @@ export const pause = () => {
 };
 
 export const destroy = async () => {
+  if (!isTizenBackend()) {
+    if (videoElement) {
+      videoElement.pause();
+      videoElement.removeAttribute("src");
+      videoElement.onloadstart = null;
+      videoElement.onloadedmetadata = null;
+      videoElement.oncanplay = null;
+      videoElement.onwaiting = null;
+      videoElement.onplaying = null;
+      videoElement.onpause = null;
+      videoElement.onended = null;
+      videoElement.onstalled = null;
+      videoElement.onerror = null;
+      videoElement.load();
+      videoElement.style.display = "none";
+    }
+    resetPlaybackState();
+    updateHtml5DebugOverlay();
+    pushDebugEvent("html5 destroy()");
+    return;
+  }
+
   if (window.webapis && webapis.avplay) {
     try {
       const currentState = getState();
@@ -329,6 +572,17 @@ export const destroy = async () => {
 };
 
 export const getState = () => {
+  if (!isTizenBackend()) {
+    if (!videoElement || !currentUrl) return null;
+    if (state.waitingForGesture) return STATES.READY;
+    if (state.preparing) return "IDLE";
+    if (videoElement.ended) return "IDLE";
+    if (videoElement.paused) {
+      return videoElement.currentTime > 0 ? STATES.PAUSED : STATES.READY;
+    }
+    return STATES.PLAYING;
+  }
+
   if (!window.webapis || !webapis.avplay || !webapis.avplay.getState) {
     return null;
   }
@@ -340,6 +594,7 @@ export const getState = () => {
   }
 };
 
+export const getBackend = () => backend;
 export const getBuffering = () => state.buffering;
 export const getCurrentUrl = () => currentUrl;
 export const getPreparing = () => state.preparing;
@@ -355,6 +610,9 @@ const isTimeQueryableState = (s) =>
   s === STATES.PLAYING || s === STATES.PAUSED || s === STATES.READY;
 
 export const getCurrentTime = () => {
+  if (!isTizenBackend()) {
+    return videoElement?.currentTime || 0;
+  }
   if (!window.webapis || !webapis.avplay) return 0;
   const s = getState();
   if (!isTimeQueryableState(s)) return 0;
@@ -367,6 +625,9 @@ export const getCurrentTime = () => {
 };
 
 export const getVideoDuration = () => {
+  if (!isTizenBackend()) {
+    return Number.isFinite(videoElement?.duration) ? videoElement.duration : 0;
+  }
   if (!window.webapis || !webapis.avplay) return 0;
   const s = getState();
   if (!isTimeQueryableState(s)) return 0;
@@ -379,6 +640,14 @@ export const getVideoDuration = () => {
 };
 
 export const seekTo = (seconds) => {
+  if (!isTizenBackend()) {
+    if (!videoElement) return;
+    const duration = Number.isFinite(videoElement.duration) ? videoElement.duration : 0;
+    videoElement.currentTime = Math.max(0, Math.min(seconds, duration || seconds));
+    updateHtml5DebugOverlay();
+    pushDebugEvent("html5 seekTo", { seconds: videoElement.currentTime });
+    return;
+  }
   if (!window.webapis || !webapis.avplay) return;
   const s = getState();
   if (!isTimeQueryableState(s)) return;
@@ -419,6 +688,7 @@ export default {
   getState,
   getBuffering,
   getPreparing,
+  getBackend,
   getLastError,
   getDebugEvents,
   state,

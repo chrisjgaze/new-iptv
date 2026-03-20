@@ -32,11 +32,16 @@ import fonts from "./fonts";
 import { browsePreload } from "./api/browsePreload";
 import { categoriesPreload } from "./api/categoriesPreload";
 import { categoryMoviesPreload } from "./api/categoryMoviesPreload";
+import { seriesCategoriesPreload } from "./api/seriesCategoriesPreload";
+import { seriesCategoryPreload } from "./api/seriesCategoryPreload";
 import { entityPreload } from "./api/entityPreload";
 import LeftNavWrapper from "./pages/LeftNavWrapper";
+import { startRemoteBridge } from "./remoteBridge";
 import theme from "theme";
 
 const Player = lazy(() => import("./pages/Player"));
+const SearchPage = lazy(() => import("./pages/Search"));
+const SeriesDetail = lazy(() => import("./pages/SeriesDetail"));
 const Grid = lazy(() => import("./pages/Grid"));
 const Loops = lazy(() => import("./pages/Loops"));
 const Infinite = lazy(() => import("./pages/Infinite"));
@@ -146,6 +151,7 @@ function registerTizenRemoteKeys() {
 }
 
 registerTizenRemoteKeys();
+startRemoteBridge();
 
 const { renderer, render } = createRenderer();
 loadFonts(fonts);
@@ -191,11 +197,29 @@ render(() => {
             preload={categoriesPreload}
           />
           <KeepAliveRoute
+            id="search"
+            path="search"
+            component={SearchPage}
+          />
+          <KeepAliveRoute
+            id="series-categories"
+            path="series"
+            component={Browse}
+            preload={seriesCategoriesPreload}
+          />
+          <KeepAliveRoute
             id="category-movies"
             path="categories/:id"
             component={Browse}
             preload={categoryMoviesPreload}
           />
+          <KeepAliveRoute
+            id="series-category"
+            path="series/:id"
+            component={Browse}
+            preload={seriesCategoryPreload}
+          />
+          <Route path="series/show/:id" component={SeriesDetail} />
           <Route path="loops" component={Loops} preload={tmdbData} />
           <Route path="infinite" component={Infinite} preload={tmdbData} />
           <Route path="tmdbgrid" component={TMDBGrid} preload={tmdbData} />

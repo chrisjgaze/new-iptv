@@ -6,6 +6,7 @@
   "main": "index.js",
   "scripts": {
     "start": "vite --host --force",
+    "remote:bridge": "python3 scripts/ir-remote-bridge.py",
     "start:dom": "VITE_LIGHTNING_DOM_RENDERING=true vite --host --force",
     "start:prod": "vite --host --force --mode production",
     "build": "vite build --sourcemap=true",
