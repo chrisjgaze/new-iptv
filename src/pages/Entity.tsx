@@ -92,7 +92,7 @@ const Entity = (props) => {
     console.log("Ext " + ext);
 
     if (streamId) {
-      navigate(`/player/${streamId}?ext=${ext}`);
+      navigate(`/player/${streamId}?ext=${ext}&type=movie`);
       return;
     }
 

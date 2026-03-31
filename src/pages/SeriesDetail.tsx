@@ -58,7 +58,7 @@ const SeriesDetail = () => {
     const episodeId = item?.id;
     const ext = item?.container_extension || "mp4";
     if (!episodeId) return true;
-    navigate(`/player/${episodeId}?ext=${ext}`);
+    navigate(`/player/${episodeId}?ext=${ext}&type=series`);
     return true;
   }
 

@@ -69,6 +69,7 @@ const Player = () => {
   }
 
   const ext = getQueryParam("ext") || "mp4";
+  const streamType = getQueryParam("type") === "series" ? "series" : "movie";
   const OverviewContainer = {
     width: 900,
     height: 500,
@@ -352,7 +353,7 @@ const Player = () => {
       console.log("Player stream id", {
         streamId
       });
-      const streamUrl = `${streamBase}/movie/${streamUser}/${streamPass}/${streamId}.${ext}`;
+      const streamUrl = `${streamBase}/${streamType}/${streamUser}/${streamPass}/${streamId}.${ext}`;
       //const proxyUrl = `${proxyBase}/p/?u=${encodeURIComponent(streamUrl)}`;
       const proxyUrl = `${streamUrl}`;
       console.log("Playing stream URL:", proxyUrl);
