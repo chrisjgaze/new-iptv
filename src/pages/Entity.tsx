@@ -4,22 +4,26 @@ import {
   View,
   Show,
   assertTruthy,
-  setActiveElement
 } from "@lightningtv/solid";
 import { Column, Row } from "@lightningtv/solid/primitives";
 
-import { createEffect, on, createSignal } from "solid-js";
+import { createEffect, createMemo, createResource, on, createSignal } from "solid-js";
 import { TileRow, Button } from "../components";
 import { setGlobalBackground } from "../state";
 import ContentBlock from "../components/ContentBlock";
-import { useNavigate } from "@solidjs/router";
+import { useNavigate, useParams } from "@solidjs/router";
 import styles from "../styles";
+import { getImageUrl } from "../api";
+import { getWatchedProgress, type WatchedMap } from "../api/providers/watchProgress";
+import { setPendingPlayerMetadata } from "../utils/playerMetadata";
 //import * as player from "../video";
 const Entity = (props) => {
   const [backdropAlpha, setBackdropAlpha] = createSignal(0);
   const [playFocused, setPlayFocused] = createSignal(false);
   const [playMessage, setPlayMessage] = createSignal("");
   const navigate = useNavigate();
+  const params = useParams();
+  const [watched] = createResource<WatchedMap>(getWatchedProgress);
 
   createEffect(
     on(
@@ -83,16 +87,51 @@ const Entity = (props) => {
     return new URLSearchParams(hashQuery).get(key);
   }
 
+  const streamId = createMemo(() => getQueryParam("stream_id") || "");
+  const ext = createMemo(() => getQueryParam("ext") || "mp4");
+  const watchedEntry = createMemo(() => watched()?.[streamId()] || null);
+  const watchedPct = createMemo(() => {
+    const pct = Number(watchedEntry()?.watched_pct || 0);
+    return Math.max(0, Math.min(100, pct));
+  });
+  const resumeMs = createMemo(() => Number(watchedEntry()?.elapsed_time || 0));
+  const playerMetadata = createMemo(() => {
+    const data = props.data.entity?.();
+    if (!data) return null;
+
+    return {
+      mediaType: "movie" as const,
+      media_id: streamId(),
+      tmdbId: params.id || "",
+      title: data.heroContent?.title || data.title || "",
+      overview: data.heroContent?.description || data.overview || "",
+      posterUrl: data.poster_path ? getImageUrl(data.poster_path) : "",
+      backdropUrl: data.backgroundImage || "",
+      containerExtension: ext()
+    };
+  });
+
   function onEnterTrailer() {
     console.log("Enter Trailer");
     setPlayMessage("");
-    const streamId = getQueryParam("stream_id");
-    const ext = getQueryParam("ext") || "mp4";
-    console.log("Streamid " + streamId);
-    console.log("Ext " + ext);
+    console.log("Streamid " + streamId());
+    console.log("Ext " + ext());
 
-    if (streamId) {
-      navigate(`/player/${streamId}?ext=${ext}&type=movie`);
+    if (streamId()) {
+      const metadata = playerMetadata();
+      if (metadata) {
+        setPendingPlayerMetadata(streamId(), {
+          mediaType: metadata.mediaType,
+          mediaId: metadata.media_id,
+          tmdbId: metadata.tmdbId,
+          title: metadata.title,
+          overview: metadata.overview,
+          posterUrl: metadata.posterUrl,
+          backdropUrl: metadata.backdropUrl,
+          containerExtension: metadata.containerExtension
+        });
+      }
+      navigate(`/player/${streamId()}?ext=${ext()}&type=movie`);
       return;
     }
 
@@ -103,6 +142,28 @@ const Entity = (props) => {
       search: window.location.search
     });
     setPlayMessage(message);
+  }
+
+  function onResumeTrailer() {
+    setPlayMessage("");
+    if (!streamId()) {
+      setPlayMessage("No stream_id found on entity route");
+      return;
+    }
+    const metadata = playerMetadata();
+    if (metadata) {
+      setPendingPlayerMetadata(streamId(), {
+        mediaType: metadata.mediaType,
+        mediaId: metadata.media_id,
+        tmdbId: metadata.tmdbId,
+        title: metadata.title,
+        overview: metadata.overview,
+        posterUrl: metadata.posterUrl,
+        backdropUrl: metadata.backdropUrl,
+        containerExtension: metadata.containerExtension
+      });
+    }
+    navigate(`/player/${streamId()}?ext=${ext()}&type=movie&seek_time=${resumeMs()}`);
   }
 
   let columnRef, backdropRef, entityActions;
@@ -148,7 +209,40 @@ const Entity = (props) => {
           >
             Play
           </Button>
-          <Button width={300}>Resume</Button>
+          <View
+            width={300}
+            height={90}
+            announce={["Resume", "button"]}
+            forwardStates
+            onEnter={onResumeTrailer}
+            color="#31585a"
+            borderRadius={12}
+            alpha={streamId() ? 1 : 0.55}
+            $focus={{ color: "#4f8688" }}
+          >
+            <Show when={watchedPct() > 0}>
+              <View
+                width={Math.max(12, Math.round((watchedPct() / 100) * 300))}
+                height={90}
+                borderRadius={12}
+                colorTop="#f5d25f"
+                colorBottom="#db8e24"
+                alpha={0.95}
+              />
+            </Show>
+            <Text
+              x={150}
+              y={28}
+              width={300}
+              mountX={0.5}
+              textAlign="center"
+              fontSize={26}
+              fontWeight="bold"
+              color="#ffffff"
+            >
+              {watchedPct() > 0 ? `Resume ${watchedPct()}%` : "Resume"}
+            </Text>
+          </View>
         </Row>
 
         <Show when={playMessage()}>

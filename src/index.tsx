@@ -24,7 +24,6 @@ import { Route, Navigate } from "@solidjs/router";
 import { lazy, createEffect } from "solid-js";
 import App from "./pages/App";
 import Browse from "./pages/Browse";
-import TMDB from "./pages/TMDB";
 import DestroyPage from "./pages/Destroy";
 import { tmdbData, destroyData } from "./api/tmdbData";
 import NotFound from "./pages/NotFound";
@@ -34,6 +33,7 @@ import { categoriesPreload } from "./api/categoriesPreload";
 import { categoryMoviesPreload } from "./api/categoryMoviesPreload";
 import { seriesCategoriesPreload } from "./api/seriesCategoriesPreload";
 import { seriesCategoryPreload } from "./api/seriesCategoryPreload";
+import { recentlyWatchedPreload } from "./api/recentlyWatchedPreload";
 import { entityPreload } from "./api/entityPreload";
 import LeftNavWrapper from "./pages/LeftNavWrapper";
 import { startRemoteBridge } from "./remoteBridge";
@@ -46,7 +46,6 @@ const Grid = lazy(() => import("./pages/Grid"));
 const Loops = lazy(() => import("./pages/Loops"));
 const Infinite = lazy(() => import("./pages/Infinite"));
 const TMDBGrid = lazy(() => import("./pages/TMDBGrid"));
-const Portal = lazy(() => import("./pages/Portal"));
 const MatrixPage = lazy(() => import("./pages/Matrix"));
 const TextPage = lazy(() => import("./pages/Text"));
 const TextPosterPage = lazy(() => import("./pages/TextPoster"));
@@ -180,10 +179,6 @@ render(() => {
       <HashRouter root={(props) => <App {...props} />}>
         <Route path="" component={LeftNavWrapper}>
           <Route path="" component={() => <Navigate href="/browse/all" />} />
-          <Route path="examples" component={Portal}>
-            <Route path="/" />
-            <Route path="tmdb" component={TMDB} preload={tmdbData} />
-          </Route>
           <KeepAliveRoute
             id="browse"
             path="browse/:filter"
@@ -200,6 +195,12 @@ render(() => {
             id="search"
             path="search"
             component={SearchPage}
+          />
+          <KeepAliveRoute
+            id="recently-watched"
+            path="recents"
+            component={Browse}
+            preload={recentlyWatchedPreload}
           />
           <KeepAliveRoute
             id="series-categories"

@@ -68,14 +68,13 @@ export default function NavDrawer(props) {
     const base = 366;
     const step = 90;
     let index = 0;
-    if (useMatch(() => "/browse/movie")()) index = 1;
-    if (useMatch(() => "/browse/tv")()) index = 2;
+    if (useMatch(() => "/browse/tv")()) index = 1;
     if (useMatch(() => "/categories")() || useMatch(() => "/categories/:id")())
-      index = 3;
+      index = 2;
     if (useMatch(() => "/series")() || useMatch(() => "/series/:id")() || useMatch(() => "/series/show/:id")())
-      index = 4;
-    if (useMatch(() => "/search")()) index = 5;
-    if (useMatch(() => "/examples")()) index = 6;
+      index = 3;
+    if (useMatch(() => "/search")()) index = 4;
+    if (useMatch(() => "/recents")()) index = 5;
     return base + step * index;
   });
 
@@ -118,14 +117,6 @@ export default function NavDrawer(props) {
           Trending
         </NavButton>
         <NavButton
-          icon="movie"
-          iconColor={"#fff"}
-          announce={["Movies Browse", "button"]}
-          onEnter={() => handleNavigate("/browse/movie")}
-        >
-          Movies
-        </NavButton>
-        <NavButton
           icon="tv"
           iconColor={"#fff"}
           announce={["TV Browse", "button"]}
@@ -136,10 +127,10 @@ export default function NavDrawer(props) {
         <NavButton
           icon="movie"
           iconColor={"#fff"}
-          announce={["My Movies", "button"]}
+          announce={["Movies", "button"]}
           onEnter={() => handleNavigate("/categories")}
         >
-          My Movies
+          Movies
         </NavButton>
         <NavButton
           icon="series"
@@ -160,10 +151,10 @@ export default function NavDrawer(props) {
         <NavButton
           icon="experiment"
           iconColor={"#fff"}
-          announce={["Config", "button"]}
-          onEnter={() => handleNavigate("/examples")}
+          announce={["Recents", "button"]}
+          onEnter={() => handleNavigate("/recents")}
         >
-          Config
+          Recents
         </NavButton>
       </Column>
       <View skipFocus ref={backdrop} style={styles.Gradient} />

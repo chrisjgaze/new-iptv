@@ -1,4 +1,5 @@
 import type { Tile } from "../formatters/ItemFormatter";
+import { proxyRemoteImage } from "../index";
 
 const SEARCH_BASE = import.meta.env.VITE_SEARCH_URL || "http://192.168.1.46:5000/api/search";
 
@@ -21,12 +22,14 @@ type RawSearchItem = {
   backdrop_path_tmdb?: string;
   category_id?: string | number;
   container_extension?: string;
+  stream_type?: string | number;
 };
 
 type SearchPayload = {
   results?: RawSearchItem[];
   movies?: RawSearchItem[];
   series?: RawSearchItem[];
+  channels?: RawSearchItem[];
   data?: RawSearchItem[];
 };
 
@@ -45,27 +48,41 @@ function normalizeResults(payload: SearchPayload): RawSearchItem[] {
   const series = Array.isArray(payload?.series)
     ? payload.series.map((item) => ({ ...item, media_type: item.media_type || "series" }))
     : [];
-  return [...movies, ...series];
+  const channels = Array.isArray(payload?.channels)
+    ? payload.channels.map((item) => ({ ...item, media_type: item.media_type || "channel" }))
+    : [];
+  return [...movies, ...series, ...channels];
 }
 
 function imageFor(item: RawSearchItem) {
-  return item.stream_icon || item.cover_big || item.cover || "./assets/fallback.png";
+  return proxyRemoteImage(item.stream_icon || item.cover_big || item.cover || "") || "./assets/fallback.png";
 }
 
 function backdropFor(item: RawSearchItem, poster: string) {
-  return item.backdrop_path_tmdb || item.backdrop_path || item.backdrop || item.cover_big || poster || "";
+  return (
+    proxyRemoteImage(
+      item.backdrop_path_tmdb || item.backdrop_path || item.backdrop || item.cover_big || ""
+    ) ||
+    poster ||
+    ""
+  );
 }
 
 function hrefFor(item: RawSearchItem, tmdbId: string, fallbackId: string, ext: string) {
   if (item.media_type === "series") {
     return `/series/show/${fallbackId}`;
   }
+  if (item.media_type === "channel") {
+    return `/player/${fallbackId}?type=live&ext=${ext}`;
+  }
   if (!tmdbId) return "";
   return `/entity/movie/${tmdbId}?stream_id=${fallbackId}&ext=${ext}`;
 }
 
 function entityTypeFor(item: RawSearchItem) {
-  return item.media_type === "series" ? "tv" : "movie";
+  if (item.media_type === "series") return "tv";
+  if (item.media_type === "channel") return "channel";
+  return "movie";
 }
 
 function toTile(item: RawSearchItem, index: number): Tile | null {
@@ -76,7 +93,7 @@ function toTile(item: RawSearchItem, index: number): Tile | null {
   const backdrop = backdropFor(item, poster);
   const tmdbId = String(item.tmdb_id || item.tmdb || "");
   const fallbackId = String(item.stream_id || item.series_id || index + 1);
-  const ext = item.container_extension || "mp4";
+  const ext = item.media_type === "channel" ? item.container_extension || "ts" : item.container_extension || "mp4";
 
   return {
     src: poster,

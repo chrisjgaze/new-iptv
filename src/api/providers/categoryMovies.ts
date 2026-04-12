@@ -1,5 +1,5 @@
 import type { Tile } from "../formatters/ItemFormatter";
-import { getImageUrl } from "../index";
+import { getImageUrl, proxyRemoteImage } from "../index";
 
 const CATEGORY_MOVIES_BASE =
   import.meta.env.VITE_CATEGORY_MOVIES_BASE ||
@@ -29,9 +29,9 @@ function normalizeMovies(payload: unknown): RawMovie[] {
 
 function proxyImage(src?: string) {
   if (!src) return "";
+  if (!src.includes("image.tmdb.org/t/p/")) return proxyRemoteImage(src);
   const proxyBase = import.meta.env.VITE_TMDB_IMAGE_PROXY;
   if (!proxyBase) return src;
-  if (!src.includes("image.tmdb.org/t/p/")) return src;
   const base = proxyBase.endsWith("/") ? proxyBase : `${proxyBase}/`;
   return src.replace("https://image.tmdb.org/t/p/", base);
 }

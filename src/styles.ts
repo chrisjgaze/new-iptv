@@ -179,12 +179,13 @@ const TopBar = {
 
 const ButtonText = {
   fontSize: 26,
+  fontWeight: "bold",
   lineHeight: Button.height,
   contain: "width",
   textAlign: "center",
   height: Button.height,
   width: Button.width,
-  color: theme.textPrimary,
+  color: "#ffffff",
 } satisfies IntrinsicTextNodeStyleProps;
 
 export const buttonStyles = {

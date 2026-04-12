@@ -1,3 +1,5 @@
+import { proxyRemoteImage } from "../index";
+
 type Episode = {
   id?: string | number;
   title?: string;
@@ -33,8 +35,10 @@ type SeriesInfoPayload = {
 const SERIES_INFO_BASE = import.meta.env.VITE_SERIES_INFO_URL || "http://192.168.1.46:5000/api/series";
 
 function backdropFor(payload: SeriesInfoPayload) {
-  if (Array.isArray(payload.backdrop_path)) return payload.backdrop_path[0] || payload.info?.cover || "";
-  return payload.backdrop_path || payload.info?.cover || "";
+  if (Array.isArray(payload.backdrop_path)) {
+    return proxyRemoteImage(payload.backdrop_path[0] || payload.info?.cover || "");
+  }
+  return proxyRemoteImage(payload.backdrop_path || payload.info?.cover || "");
 }
 
 function normalizeEpisode(episode: Episode) {
@@ -50,7 +54,7 @@ function normalizeEpisode(episode: Episode) {
       info.overview ||
       info.description ||
       "",
-    movie_image: episode.movie_image || info.movie_image || ""
+    movie_image: proxyRemoteImage(episode.movie_image || info.movie_image || "")
   };
 }
 
@@ -73,6 +77,7 @@ export async function getSeriesInfo(seriesId: string) {
     episodes: normalizedEpisodes,
     title: payload.info?.name || `Series ${seriesId}`,
     description: payload.info?.plot || payload.info?.overview || payload.info?.genre || "",
+    coverImage: proxyRemoteImage(payload.info?.cover || ""),
     backgroundImage: backdropFor(payload),
     seasonKeys
   };

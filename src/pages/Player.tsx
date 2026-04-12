@@ -5,8 +5,13 @@ import {
   View,
   hexColor
 } from "@lightningtv/solid";
-import { createSignal, onCleanup, onMount } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { setGlobalBackground } from "../state";
+import {
+  startLiveHlsStream,
+  updateWatchProgress
+} from "../api/providers/watchProgress";
+import { getPendingPlayerMetadata } from "../utils/playerMetadata";
 import {
   init,
   load,
@@ -21,15 +26,18 @@ import {
   getCurrentUrl,
   getBufferingInfo,
   getVideoDuration,
+  getVolume,
+  getMuted,
+  adjustVolume,
   getBackend,
   getLastError,
   getDebugEvents
 } from "../video";
-import { useNavigate } from "@solidjs/router";
-import { useParams } from "@solidjs/router";
+import { useLocation, useNavigate, useParams } from "@solidjs/router";
 
 const Player = () => {
   let parent;
+  const location = useLocation();
   const navigate = useNavigate();
   const params = useParams();
   const [isReady, setIsReady] = createSignal(false);
@@ -49,6 +57,9 @@ const Player = () => {
   const [pendingSeekMinutes, setPendingSeekMinutes] = createSignal("");
   const [lastKey, setLastKey] = createSignal("");
   const [seekNotice, setSeekNotice] = createSignal("");
+  const [playerInitialized, setPlayerInitialized] = createSignal(false);
+  const [volumePercent, setVolumePercent] = createSignal(100);
+  const [isMuted, setIsMuted] = createSignal(false);
   const streamBase =
     import.meta.env.VITE_STREAM_BASE_URL || "http://YOUR_BASE_URL";
   const streamUser = import.meta.env.VITE_STREAM_USERNAME || "YOUR_USERNAME";
@@ -57,19 +68,37 @@ const Player = () => {
     import.meta.env.VITE_PROXY_BASE_URL || "http://192.168.1.46:8080";
 
   function getQueryParam(key: string) {
-    const search = window.location.search || "";
-    if (search.includes(key)) {
-      return new URLSearchParams(search).get(key);
-    }
-    const hash = window.location.hash || "";
-    const queryIndex = hash.indexOf("?");
-    if (queryIndex === -1) return null;
-    const hashQuery = hash.slice(queryIndex + 1);
-    return new URLSearchParams(hashQuery).get(key);
+    return new URLSearchParams(location.search).get(key);
   }
 
-  const ext = getQueryParam("ext") || "mp4";
-  const streamType = getQueryParam("type") === "series" ? "series" : "movie";
+  function getCurrentStream() {
+    const ext = getQueryParam("ext") || "mp4";
+    const initialSeekMs = Number.parseInt(getQueryParam("seek_time") || "0", 10);
+    const requestedType = getQueryParam("type");
+    const streamType =
+      requestedType === "series" || requestedType === "live"
+        ? requestedType
+        : "movie";
+    const metadata = getPendingPlayerMetadata(params.id || "");
+
+    return {
+      streamId: params.id || "",
+      ext,
+      initialSeekMs: Number.isNaN(initialSeekMs) ? 0 : initialSeekMs,
+      streamType,
+      mediaType:
+        metadata.mediaType ||
+        (streamType === "series" ? "series" : streamType === "live" ? "movie" : "movie"),
+      mediaId: metadata.mediaId || params.id || "",
+      tmdbId: metadata.tmdbId || "",
+      title: metadata.title || "",
+      subtitle: metadata.subtitle || "",
+      overview: metadata.overview || "",
+      posterUrl: metadata.posterUrl || "",
+      backdropUrl: metadata.backdropUrl || "",
+      containerExtension: metadata.containerExtension || ext
+    };
+  }
   const OverviewContainer = {
     width: 900,
     height: 500,
@@ -174,6 +203,9 @@ const Player = () => {
   const SEEK_STEP_SECONDS = 15;
   let controlsHideTimer;
   let numericSeekTimer;
+  let saveProgressTimer;
+  let hasAppliedInitialSeek = false;
+  let isSavingProgress = false;
 
   function formatTime(totalSeconds: number) {
     const safe = Math.max(0, Math.floor(totalSeconds || 0));
@@ -200,6 +232,15 @@ const Player = () => {
   function revealControls() {
     setControlsVisible(true);
     scheduleControlsHide();
+  }
+
+  function adjustPlayerVolume(delta: number) {
+    revealControls();
+    if (getBackend?.() !== "html5") return false;
+    const nextVolume = adjustVolume(delta);
+    setVolumePercent(Math.round(nextVolume * 100));
+    setSeekNotice(`Volume ${Math.round(nextVolume * 100)}%`);
+    return true;
   }
 
   function togglePlayPause() {
@@ -307,9 +348,87 @@ const Player = () => {
       routeId: params.id,
       state: getState()
     });
+    await saveWatchProgress();
     await destroy();
     navigate(-1);
     return true;
+  }
+
+  async function saveWatchProgress() {
+    const stream = getCurrentStream();
+    if (stream.streamType === "live") return;
+    const episodeId = stream.streamId;
+    const elapsedTime = Math.floor(currentTimeSec());
+    const totalDuration = Math.floor(durationSec());
+    if (!episodeId || !elapsedTime || !totalDuration || isSavingProgress) return;
+
+    isSavingProgress = true;
+    try {
+      await updateWatchProgress({
+        episodeId,
+        elapsedTimeSec: elapsedTime,
+        totalDurationSec: totalDuration,
+        mediaType: stream.mediaType,
+        mediaId: stream.mediaId,
+        tmdbId: stream.tmdbId,
+        title: stream.title,
+        subtitle: stream.subtitle,
+        overview: stream.overview,
+        posterUrl: stream.posterUrl,
+        backdropUrl: stream.backdropUrl,
+        containerExtension: stream.containerExtension
+      });
+    } catch (error) {
+      console.warn("Failed to update watch progress", error);
+    } finally {
+      isSavingProgress = false;
+    }
+  }
+
+  async function loadCurrentStream(reason: string) {
+    const stream = getCurrentStream();
+    if (!stream.streamId) {
+      console.log("Player load skipped", {
+        reason,
+        streamId: stream.streamId
+      });
+      return;
+    }
+
+    hasAppliedInitialSeek = false;
+    setSeekNotice("");
+    setPendingSeekMinutes("");
+    setCurrentTimeSec(0);
+    setDurationSec(0);
+    setDebugTime("0:00");
+    setDebugError("");
+
+    try {
+      let streamUrl = `${streamBase}/${stream.streamType}/${streamUser}/${streamPass}/${stream.streamId}.${stream.ext}`;
+
+      if (stream.streamType === "live") {
+        const livePayload = await startLiveHlsStream({
+          streamId: stream.streamId,
+          containerExtension: stream.ext
+        });
+        streamUrl = livePayload.playlist_url || "";
+        console.log("Player live HLS payload", livePayload);
+      }
+
+      setDebugUrl(streamUrl);
+      console.log("Player loadCurrentStream", {
+        reason,
+        ...stream,
+        streamUrl
+      });
+      console.log("Playing stream URL:", streamUrl);
+      await load({ streamUrl });
+    } catch (error) {
+      console.error("Player load promise rejected", error);
+      setDebugError(
+        error instanceof Error ? error.message : JSON.stringify(error)
+      );
+    }
   }
 
   onMount(async () => {
@@ -337,9 +456,11 @@ const Player = () => {
     });
 
     try {
+      const stream = getCurrentStream();
       console.log("Player mount", {
-        routeId: params.id,
-        ext
+        routeId: stream.streamId,
+        ext: stream.ext,
+        streamType: stream.streamType
       });
       setGlobalBackground("#000000");
       parent = document.querySelector('[data-testid="player"]') as HTMLElement;
@@ -349,23 +470,25 @@ const Player = () => {
       console.log("Player before init");
       init(parent);
       console.log("Player after init");
-      const streamId = params.id;
-      console.log("Player stream id", {
-        streamId
-      });
-      const streamUrl = `${streamBase}/${streamType}/${streamUser}/${streamPass}/${streamId}.${ext}`;
-      //const proxyUrl = `${proxyBase}/p/?u=${encodeURIComponent(streamUrl)}`;
-      const proxyUrl = `${streamUrl}`;
-      console.log("Playing stream URL:", proxyUrl);
-      void load({ streamUrl: proxyUrl }).catch((error) => {
-        console.error("Player load promise rejected", error);
-      });
+      setPlayerInitialized(true);
+      void loadCurrentStream("mount");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : JSON.stringify(error);
       console.error("Player mount failed", error);
       setDebugError(`Player mount failed: ${message}`);
     }
+  });
+
+  createEffect(() => {
+    const streamId = params.id;
+    const routeSearch = location.search;
+    if (!playerInitialized() || !streamId) return;
+    console.log("Player route update trigger", {
+      streamId,
+      routeSearch
+    });
+    void loadCurrentStream("route-update");
   });
 
   const stateTimer = setInterval(() => {
@@ -380,6 +503,8 @@ const Player = () => {
     setDebugBuffering(buffering);
     setDebugPreparing(preparing);
     setDebugUrl(getCurrentUrl?.() || "");
+    setVolumePercent(Math.round((getVolume?.() || 0) * 100));
+    setIsMuted(!!getMuted?.());
     setDebugError(
       lastError
         ? `${lastError.at} ${lastError.message}`
@@ -402,6 +527,19 @@ const Player = () => {
     if (buffering || preparing) {
       setControlsVisible(true);
     }
+    if (
+      !hasAppliedInitialSeek &&
+      getCurrentStream().streamType !== "live" &&
+      getCurrentStream().initialSeekMs > 0 &&
+      ready &&
+      timeSec >= 0
+    ) {
+      hasAppliedInitialSeek = true;
+      const seekSeconds = Math.floor(getCurrentStream().initialSeekMs / 1000);
+      seekTo(seekSeconds);
+      setSeekNotice(`Resumed from ${formatTime(seekSeconds)}`);
+      revealControls();
+    }
   }, 300);
 
   const frames = ["|", "/", "-", "\\"];
@@ -411,11 +549,19 @@ const Player = () => {
     setSpinnerFrame(frames[frameIndex]);
   }, 120);
 
+  saveProgressTimer = window.setInterval(() => {
+    if (debugState() === "PLAYING" || debugState() === "PAUSED") {
+      void saveWatchProgress();
+    }
+  }, 15000);
+
   onCleanup(() => {
     clearInterval(stateTimer);
     clearInterval(spinnerTimer);
+    if (saveProgressTimer) clearInterval(saveProgressTimer);
     if (controlsHideTimer) clearTimeout(controlsHideTimer);
     if (numericSeekTimer) clearTimeout(numericSeekTimer);
+    void saveWatchProgress();
     destroy();
   });
 
@@ -426,8 +572,8 @@ const Player = () => {
       autofocus
       onBack={exitPlayer}
       onEnter={togglePlayPause}
-      onUp={revealControls}
-      onDown={revealControls}
+      onUp={() => adjustPlayerVolume(0.1) || (revealControls(), true)}
+      onDown={() => adjustPlayerVolume(-0.1) || (revealControls(), true)}
       onLeft={() => seekBy(-SEEK_STEP_SECONDS)}
       onRight={() => seekBy(SEEK_STEP_SECONDS)}
       onKeyPress={handleNumericSeek}
@@ -451,7 +597,7 @@ const Player = () => {
             {debugState() === "PAUSED" ? "Paused" : "Playing"}
           </Text>
           <Text x={250} y={28} fontSize={22}>
-            {`Backend ${debugBackend()}  Left/Right seek ${SEEK_STEP_SECONDS}s`}
+            {`Backend ${debugBackend()}  Left/Right seek ${SEEK_STEP_SECONDS}s  Up/Down volume ${volumePercent()}%${isMuted() ? " muted" : ""}`}
           </Text>
           <Text x={520} y={28} fontSize={22}>
             {`Enter ${debugState() === "PAUSED" ? "Play" : "Pause"}`}

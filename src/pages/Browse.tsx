@@ -26,6 +26,8 @@ import { createInfiniteScroll } from "../components/pagination";
 import ContentBlock from "../components/ContentBlock";
 import { debounce } from "@solid-primitives/scheduled";
 import api, { getImageUrl } from "../api";
+import { Button } from "../components";
+import { deleteRecentEntry } from "../api/providers/watchProgress";
 
 const Browse = (props) => {
   const preload = usePreloadRoute();
@@ -33,10 +35,14 @@ const Browse = (props) => {
   const navigate = useNavigate();
   let firstRun = true;
   let vgRef;
+  let recentsActionRowRef;
   const location = useLocation();
   const isCategoriesList = () => location.pathname === "/categories";
   const isSeriesCategoriesList = () => location.pathname === "/series";
   const isCategoryMovies = useMatch(() => "/categories/:id");
+  const isRecentsRoute = () => location.pathname === "/recents";
+  const [pendingDeleteItem, setPendingDeleteItem] = createSignal<any>(null);
+  const [deleteMessage, setDeleteMessage] = createSignal("");
 
   const isCategoryRoute = useMatch(() => "/categories/*all");
   const plotBase = import.meta.env.VITE_PLOT_URL;
@@ -361,6 +367,7 @@ const Browse = (props) => {
   }
 
   function navigateToItem(item: any) {
+    if (pendingDeleteItem()) return true;
     if (!item?.href) {
       const message = `No href for selected item: ${item?.title || "unknown"}`;
       console.warn(message, item);
@@ -373,6 +380,7 @@ const Browse = (props) => {
   }
 
   function onEnter(this: ElementNode) {
+    if (pendingDeleteItem()) return true;
     this.display = "flex";
     let entity = this.children.find((c) =>
       c.states!.has("focus")
@@ -386,6 +394,48 @@ const Browse = (props) => {
     applySelection(pages[0], true);
     firstRun = false;
   });
+
+  createEffect(() => {
+    if (pendingDeleteItem()) {
+      queueMicrotask(() => recentsActionRowRef?.setFocus?.());
+    }
+  });
+
+  function requestDelete(item: any) {
+    if (!isRecentsRoute() || !item?.item?.recent_key) return true;
+    setDeleteMessage("");
+    setPendingDeleteItem(item);
+    return true;
+  }
+
+  function cancelDelete() {
+    setDeleteMessage("");
+    setPendingDeleteItem(null);
+    queueMicrotask(() => vgRef?.setFocus?.());
+    return true;
+  }
+
+  async function confirmDelete() {
+    const item = pendingDeleteItem();
+    const recentKey = item?.item?.recent_key;
+    if (!recentKey) return cancelDelete();
+    try {
+      const deleted = await deleteRecentEntry(recentKey);
+      if (deleted) {
+        provider().setPages((pages) =>
+          pages.filter((entry) => entry?.item?.recent_key !== recentKey)
+        );
+        setPendingDeleteItem(null);
+        setDeleteMessage("");
+        queueMicrotask(() => vgRef?.setFocus?.());
+        return true;
+      }
+      setDeleteMessage("Could not delete this item.");
+    } catch (error) {
+      setDeleteMessage(error instanceof Error ? error.message : String(error));
+    }
+    return true;
+  }
 
   return (
     <Show when={provider().pages().length}>
@@ -495,10 +545,51 @@ const Browse = (props) => {
                 </View>
               );
             }
-            return <Thumbnail item={current} onEnter={() => navigateToItem(current)} />;
+            return (
+              <Thumbnail
+                item={current}
+                onEnter={() => navigateToItem(current)}
+                onEnterHold={() => requestDelete(current)}
+              />
+            );
           }}
         </VirtualGrid>
       </View>
+      <Show when={pendingDeleteItem()}>
+        <View x={520} y={330} width={880} height={360} color={0x10151de8} borderRadius={20} zIndex={30}>
+          <Text x={48} y={44} fontSize={44} fontWeight="bold">
+            Remove From Recents?
+          </Text>
+          <Text x={48} y={118} width={780} contain="width" fontSize={28} color={hexColor("cfd7e3")}>
+            {pendingDeleteItem()?.title || pendingDeleteItem()?.item?.title || "Selected item"}
+          </Text>
+          <Text x={48} y={166} width={780} contain="width" fontSize={22} color={hexColor("9eb0c4")}>
+            Hold enter on a recent item to open this dialog. Choose Delete to remove it from the list.
+          </Text>
+          <Show when={deleteMessage()}>
+            <Text x={48} y={208} width={780} contain="width" fontSize={20} color={hexColor("ff8b8b")}>
+              {deleteMessage()}
+            </Text>
+          </Show>
+          <Column ref={recentsActionRowRef} x={48} y={250} gap={24} scroll="none">
+            <Button width={300} onEnter={confirmDelete}>
+              Delete
+            </Button>
+            <Button width={300} onEnter={cancelDelete} onBack={cancelDelete} onLeft={cancelDelete}>
+              Cancel
+            </Button>
+          </Column>
+        </View>
+        <View
+          x={0}
+          y={0}
+          width={1920}
+          height={1080}
+          color={0x00000099}
+          zIndex={25}
+          onBack={cancelDelete}
+        />
+      </Show>
     </Show>
   );
 };

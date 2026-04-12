@@ -15,7 +15,9 @@ export const state = {
   playingState: false,
   buffering: false,
   preparing: false,
-  waitingForGesture: false
+  waitingForGesture: false,
+  volume: 1,
+  muted: false
 };
 
 // Map AVPlay states to your app state
@@ -77,6 +79,7 @@ const updateHtml5DebugOverlay = () => {
   const lines = [
     `Backend: ${backend}`,
     `State: ${stateLabel}`,
+    `Muted: ${videoElement?.muted ? "yes" : "no"}  Volume: ${Math.round((videoElement?.volume ?? state.volume ?? 0) * 100)}%`,
     `URL: ${currentUrl || ""}`,
     `Error: ${lastError ? lastError.message : ""}`
   ];
@@ -94,6 +97,7 @@ const resetPlaybackState = () => {
   state.buffering = false;
   state.preparing = false;
   state.waitingForGesture = false;
+  state.muted = false;
   if (debugOverlay) debugOverlay.textContent = "";
 };
 
@@ -119,6 +123,11 @@ const setLastError = (message, details) => {
   };
   if (details === undefined) console.error(`[AVPlay] ${message}`);
   else console.error(`[AVPlay] ${message}`, details);
+  updateHtml5DebugOverlay();
+};
+
+const clearLastError = () => {
+  lastError = null;
   updateHtml5DebugOverlay();
 };
 
@@ -208,17 +217,30 @@ export const init = (element) => {
       videoElement.id = "html5-player";
       videoElement.setAttribute("playsinline", "true");
       videoElement.setAttribute("webkit-playsinline", "true");
-      videoElement.controls = false;
+      videoElement.controls = true;
       videoElement.autoplay = false;
       videoElement.preload = "auto";
       videoElement.disablePictureInPicture = true;
+      videoElement.defaultMuted = false;
+      videoElement.muted = false;
+      videoElement.removeAttribute("muted");
+      videoElement.volume = 1;
       videoElement.style.cssText =
-        "position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; object-fit: contain; z-index: 1000;";
+        "position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; object-fit: cover; z-index: 1000;";
       document.body.appendChild(videoElement);
       pushDebugEvent("created html5 player element");
     } else {
       videoElement.style.display = "block";
+      videoElement.controls = true;
+      videoElement.defaultMuted = false;
+      videoElement.muted = false;
+      videoElement.removeAttribute("muted");
+      if (typeof videoElement.volume === "number" && videoElement.volume === 0) {
+        videoElement.volume = 1;
+      }
     }
+    state.volume = typeof videoElement.volume === "number" ? videoElement.volume : 1;
+    state.muted = !!videoElement.muted;
     ensureHtml5DebugOverlay();
     updateHtml5DebugOverlay();
   }
@@ -244,6 +266,10 @@ export const load = async (config) => {
         videoElement.load();
         videoElement.src = currentUrl;
         videoElement.currentTime = 0;
+        videoElement.defaultMuted = false;
+        videoElement.muted = false;
+        videoElement.removeAttribute("muted");
+        videoElement.volume = Math.max(0, Math.min(1, state.volume ?? 1));
         videoElement.onloadstart = () => {
           pushDebugEvent("html5 loadstart", { url: currentUrl });
         };
@@ -267,6 +293,9 @@ export const load = async (config) => {
           state.buffering = false;
           state.playingState = true;
           state.waitingForGesture = false;
+          state.muted = !!videoElement.muted;
+          state.volume = typeof videoElement.volume === "number" ? videoElement.volume : state.volume;
+          clearLastError();
           updateHtml5DebugOverlay();
           pushDebugEvent("html5 playing");
         };
@@ -279,6 +308,15 @@ export const load = async (config) => {
           state.playingState = false;
           updateHtml5DebugOverlay();
           pushDebugEvent("html5 ended");
+        };
+        videoElement.onvolumechange = () => {
+          state.muted = !!videoElement.muted;
+          state.volume = typeof videoElement.volume === "number" ? videoElement.volume : state.volume;
+          pushDebugEvent("html5 volumechange", {
+            muted: state.muted,
+            volume: state.volume
+          });
+          updateHtml5DebugOverlay();
         };
         videoElement.onstalled = () => {
           pushDebugEvent("html5 stalled", {
@@ -486,6 +524,12 @@ export const play = () => {
   if (!isTizenBackend()) {
     if (!videoElement) return;
     pushDebugEvent("html5 play()", { currentUrl });
+    videoElement.defaultMuted = false;
+    videoElement.muted = false;
+    videoElement.removeAttribute("muted");
+    if (typeof videoElement.volume === "number" && videoElement.volume === 0) {
+      videoElement.volume = 1;
+    }
     const playPromise = videoElement.play();
     state.playingState = true;
     if (playPromise?.catch) {
@@ -543,6 +587,7 @@ export const destroy = async () => {
       videoElement.onplaying = null;
       videoElement.onpause = null;
       videoElement.onended = null;
+      videoElement.onvolumechange = null;
       videoElement.onstalled = null;
       videoElement.onerror = null;
       videoElement.load();
@@ -622,6 +667,35 @@ export const getCurrentTime = () => {
     console.error("AVPlay getCurrentTime Exception:", e);
     return 0;
   }
+};
+
+export const getVolume = () => {
+  if (!isTizenBackend()) {
+    return typeof videoElement?.volume === "number" ? videoElement.volume : state.volume;
+  }
+  return state.volume;
+};
+
+export const getMuted = () => {
+  if (!isTizenBackend()) {
+    return !!videoElement?.muted;
+  }
+  return state.muted;
+};
+
+export const adjustVolume = (delta) => {
+  if (isTizenBackend()) return state.volume;
+  if (!videoElement) return state.volume;
+  const nextVolume = Math.max(0, Math.min(1, (videoElement.volume || 0) + delta));
+  videoElement.defaultMuted = false;
+  videoElement.muted = false;
+  videoElement.removeAttribute("muted");
+  videoElement.volume = nextVolume;
+  state.volume = nextVolume;
+  state.muted = false;
+  pushDebugEvent("html5 volume", { volume: nextVolume });
+  updateHtml5DebugOverlay();
+  return nextVolume;
 };
 
 export const getVideoDuration = () => {

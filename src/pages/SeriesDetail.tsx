@@ -3,6 +3,8 @@ import { Row, VirtualGrid } from "@lightningtv/solid/primitives";
 import { createEffect, createMemo, createResource, createSignal, For, onMount, Show } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import { setGlobalBackground } from "../state";
+import { getWatchedProgress, type WatchedMap } from "../api/providers/watchProgress";
+import { setPendingPlayerMetadata } from "../utils/playerMetadata";
 
 const seasonButtonStyles = {
   width: 220,
@@ -39,10 +41,24 @@ const episodeCardStyles = {
   }
 } as const;
 
+const progressTrackStyles = {
+  width: 320,
+  height: 8,
+  color: hexColor("263341"),
+  borderRadius: 999
+} as const;
+
 const SeriesDetail = () => {
   const params = useParams();
   const navigate = useNavigate();
-  const [series] = createResource(() => params.id, () => import("../api/providers/seriesInfo").then((m) => m.getSeriesInfo(params.id)));
+  const [series] = createResource(
+    () => params.id || "",
+    (seriesId) =>
+      import("../api/providers/seriesInfo").then((m) =>
+        seriesId ? m.getSeriesInfo(seriesId) : null
+      )
+  );
+  const [watched] = createResource<WatchedMap>(getWatchedProgress);
   const [selectedSeason, setSelectedSeason] = createSignal("");
   let seasonsRef;
   let episodesRef;
@@ -57,15 +73,69 @@ const SeriesDetail = () => {
   function playEpisode(item: any) {
     const episodeId = item?.id;
     const ext = item?.container_extension || "mp4";
+    const resumeMs = watched()?.[String(episodeId)]?.elapsed_time || 0;
+    const data = series();
     if (!episodeId) return true;
-    navigate(`/player/${episodeId}?ext=${ext}&type=series`);
+    console.log("SeriesDetail playEpisode", {
+      seriesId: params.id,
+      episodeId,
+      ext,
+      resumeMs
+    });
+    setPendingPlayerMetadata(String(episodeId), {
+      mediaType: "series",
+      mediaId: params.id || "",
+      title: data?.title || "",
+      subtitle: item?.title || item?.info?.name || "",
+      overview: data?.description || "",
+      posterUrl: data?.coverImage || "",
+      backdropUrl: data?.backgroundImage || "",
+      containerExtension: ext
+    });
+    navigate(`/player/${episodeId}?ext=${ext}&type=series&seek_time=${resumeMs}`);
     return true;
   }
 
   function watchedLabel(item: any) {
+    const watchedPct = watchedPercent(item);
+    if (watchedPct >= 100) return "Completed";
+    if (watchedPct > 0) return `Watched ${watchedPct}%`;
     const watched = series()?.watched_info?.[String(item?.id)]?.watched_pct;
     return watched ? `Watched ${watched}%` : "Ready";
   }
+
+  function watchedPercent(item: any) {
+    const entry = watched()?.[String(item?.id)];
+    const pct = entry?.watched_pct ?? series()?.watched_info?.[String(item?.id)]?.watched_pct ?? 0;
+    return Math.max(0, Math.min(100, Number(pct) || 0));
+  }
+
+  createEffect(() => {
+    const season = selectedSeason();
+    const episodes = currentEpisodes();
+    const watchedMap = watched();
+    if (!season || !episodes?.length) return;
+
+    console.log("SeriesDetail watched check", {
+      seriesId: params.id,
+      season,
+      episodeCount: episodes.length,
+      watchedKeys: Object.keys(watchedMap || {}).slice(0, 20),
+      episodes: episodes.map((episode: any) => {
+        const episodeId = String(episode?.id || "");
+        const watchedEntry =
+          watchedMap?.[episodeId] ||
+          series()?.watched_info?.[episodeId] ||
+          null;
+
+        return {
+          episodeId,
+          title: episode?.title || episode?.info?.name || null,
+          watchedEntry
+        };
+      })
+    });
+  });
 
   function selectSeason(season: string) {
     setSelectedSeason(String(season));
@@ -124,7 +194,7 @@ const SeriesDetail = () => {
                     return true;
                   }}
                 >
-                  <Text x={24} y={20} fontSize={30} color={hexColor("101010")}>Season {season}</Text>
+                  <Text x={24} y={20} fontSize={30} color={hexColor("f4f7fb")}>Season {season}</Text>
                 </View>
               )}
             </For>
@@ -161,6 +231,16 @@ const SeriesDetail = () => {
                   <Text x={20} y={190} fontSize={18} color={hexColor("66ffcc")}>
                     {watchedLabel(item())}
                   </Text>
+                  <Show when={watchedPercent(item()) > 0}>
+                    <View x={20} y={170} style={progressTrackStyles}>
+                      <View
+                        width={Math.max(10, Math.round((watchedPercent(item()) / 100) * progressTrackStyles.width))}
+                        height={progressTrackStyles.height}
+                        borderRadius={999}
+                        color={watchedPercent(item()) >= 100 ? hexColor("7fe8a6") : hexColor("f0cb00")}
+                      />
+                    </View>
+                  </Show>
                 </View>
               )}
             </VirtualGrid>

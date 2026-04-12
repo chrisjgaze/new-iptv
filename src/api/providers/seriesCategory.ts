@@ -1,4 +1,5 @@
 import type { Tile } from "../formatters/ItemFormatter";
+import { proxyRemoteImage } from "../index";
 
 const SERIES_BASE = import.meta.env.VITE_SERIES_BASE_URL || "http://192.168.1.46:5000";
 
@@ -22,8 +23,10 @@ function normalizeSeries(payload: unknown): RawSeries[] {
 }
 
 function backdropFor(item: RawSeries) {
-  if (Array.isArray(item.backdrop_path)) return item.backdrop_path[0] || item.cover || "";
-  return item.backdrop_path || item.cover || "";
+  if (Array.isArray(item.backdrop_path)) {
+    return proxyRemoteImage(item.backdrop_path[0] || item.cover || "");
+  }
+  return proxyRemoteImage(item.backdrop_path || item.cover || "");
 }
 
 export default function seriesCategoryProvider(categoryId: string) {
@@ -38,9 +41,10 @@ export default function seriesCategoryProvider(categoryId: string) {
         const id = item.series_id ?? index + 1;
         const title = item.name || `Series ${index + 1}`;
         const overview = item.plot || item.overview || item.genre || "";
+        const cover = proxyRemoteImage(item.cover) || "./assets/fallback.png";
         return {
-          src: item.cover || "./assets/fallback.png",
-          tileSrc: item.cover || "./assets/fallback.png",
+          src: cover,
+          tileSrc: cover,
           backdrop: backdropFor(item),
           href: `/series/show/${id}`,
           shortTitle: title,
