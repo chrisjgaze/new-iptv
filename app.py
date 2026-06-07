@@ -192,7 +192,7 @@ def init_db():
             fetched_at INTEGER NOT NULL
         )
     ''')
-    
+
     # favourite categories
     c.execute('''
         CREATE TABLE IF NOT EXISTS favourite_categories (
@@ -478,7 +478,7 @@ def set_favourite(cat_id, fav=True):
         c.execute("DELETE FROM favourite_categories WHERE category_id=?", (cat_id,))
     conn.commit()
     conn.close()
-    
+
 # --------------------------
 # Data classes (wired to cache)
 # --------------------------
@@ -571,8 +571,8 @@ class CategoryData:
         except Exception as e:
             logging.error(f"[ERROR] get_movies_in_category failed: {e}")
             return []
-    
-    
+
+
     @staticmethod
     def get_series_categories():
         try:
@@ -587,8 +587,8 @@ class CategoryData:
         except Exception as e:
             logging.error(f"[ERROR] get_series_categories failed: {e}")
             return []
-    
-    
+
+
     @staticmethod
     def get_series_in_category(cat_id):
         try:
@@ -664,16 +664,16 @@ def run_ffmpeg_transcode(url, playlist_file=None, segment_file_pattern=None, liv
     command.append(playlist_file)
 
     print(f"Starting transcode for: {url} cmd {command}")
-    
+
     try:
         # Run the command.
         # We capture output for logging/debugging.
         # 'check=True' will raise an exception if ffmpeg fails.
-        result = subprocess.run(command, check=True, 
+        result = subprocess.run(command, check=True,
                                 capture_output=True, text=True)
         print(f"Successfully finished transcode for url '{url}'.")
         print(f"FFmpeg stdout: {result.stdout}")
-        
+
     except subprocess.CalledProcessError as e:
         # Log the error if ffmpeg fails
         print(f"ERROR: FFmpeg failed for jurlob '{url}'.")
@@ -875,7 +875,7 @@ def api_category_series(cat_id):
 @app.route("/hls_stream", methods=["POST"])
 def hls_stream():
     logging.info(f"Call hls_stream {request}")
-    stream_url = "http://vpn.tsclean.cc:80/series/6c82e7398a/a2bfaf950817/1892268.mp4"#request.form.get("stream_url")
+    stream_url = "http://line.beetx.cc:80/series/6c82e7398a/a2bfaf950817/1892268.mp4"#request.form.get("stream_url")
     logging.info(f"Stream {stream_url}")
     thread = threading.Thread(
         target=run_ffmpeg_transcode,
@@ -887,7 +887,7 @@ def hls_stream():
     # Return an "Accepted" response to the client
     # We also give the client the exact URL to play.
     playlist_url = f"http://192.168.1.46/hls/stream.m3u8"
-    
+
     # HTTP 202 "Accepted" is the perfect status code for this.
     logging.info("Return json 202")
     return jsonify({
@@ -930,7 +930,7 @@ def send_to_tv():
     data = request.get_json()
     if not data or 'season' not in data or 'episodes' not in data:
         return jsonify({"status": "error", "error": "Invalid data"}), 400
-    
+
     for episode in data.get("episodes", []):
         info = episode.get("info", {})
 
@@ -947,7 +947,7 @@ def send_to_tv():
             info["plot"] = "Plot unavailable"
 
         episode["info"] = info  # ensure the updated info is saved back
-  
+
     filename = "series_data.json"
     filepath = os.path.join("static", "tvdata", filename)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -1126,7 +1126,7 @@ def play_episode_on_tv():
             "details": str(e),
             "original_url": original_url
         }), 504
-        
+
     if not redirect_url:
         return jsonify({"error": "Missing stream_url"}), 400
 
@@ -1222,7 +1222,7 @@ def vlc_command():
 
     # Send command as you do today
     response = send_vlc_command2(command)
-    
+
     if 'episode' in command:
         logging.info(f"Received command {command}")
         parts = command.split()
@@ -1231,7 +1231,7 @@ def vlc_command():
             CURRENT_MEDIA["id"] = int(parts[1])  # convert "1234" to integer
         logging.info(f"Updated Media {CURRENT_MEDIA}")
 
-        
+
     # If pausing or stopping, record progress (only if we know what's playing)
     if command in {'pause', 'stop'}:# and CURRENT_MEDIA["type"] == "episode" and CURRENT_MEDIA["id"]:
         try:
@@ -1315,7 +1315,7 @@ def get_plot(tmdb_id):
         "overview": data.get("overview")
     })
 
-    
+
 # ----------------------------------------------
 # VLC STATUS FUNCTION
 # ----------------------------------------------
