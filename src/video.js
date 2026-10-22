@@ -9,6 +9,10 @@ let lastError = null;
 const debugEvents = [];
 let transitionLock = Promise.resolve();
 let backend = "none";
+let loadGeneration = 0;
+// Large MP4s with their index (moov atom) at the end of the file can take well over
+// 15 s to prepare on a 2019-2020 TV over a slow provider. Give them time.
+const PREPARE_TIMEOUT_MS = 45000;
 let debugOverlay = null;
 
 export const state = {
@@ -476,16 +480,24 @@ export const load = async (config) => {
       pushDebugEvent("display rect set", { width, height });
 
       // 4. Prepare (This is async on Tizen)
+      const generation = ++loadGeneration;
       return new Promise((resolve, reject) => {
         const timeoutId = window.setTimeout(() => {
+          if (generation !== loadGeneration) return;
           state.preparing = false;
           setLastError("AVPlay prepareAsync timed out", {
             url,
             elapsedMs: Date.now() - loadStartedAt,
             state: getState()
           });
+          try {
+            webapis.avplay.stop();
+            webapis.avplay.close();
+          } catch (e) {
+            pushDebugEvent("close after prepare timeout failed", e);
+          }
           reject(new Error("AVPlay prepareAsync timed out"));
-        }, 15000);
+        }, PREPARE_TIMEOUT_MS);
 
         pushDebugEvent("prepareAsync call", {
           state: getState()
@@ -493,6 +505,11 @@ export const load = async (config) => {
         webapis.avplay.prepareAsync(
           () => {
             clearTimeout(timeoutId);
+            if (generation !== loadGeneration) {
+              pushDebugEvent("prepareAsync success ignored (newer load or destroy)");
+              resolve();
+              return;
+            }
             state.preparing = false;
             pushDebugEvent("prepareAsync success", {
               elapsedMs: Date.now() - loadStartedAt,
@@ -600,6 +617,7 @@ export const destroy = async () => {
   }
 
   if (window.webapis && webapis.avplay) {
+    loadGeneration += 1;
     try {
       const currentState = getState();
       pushDebugEvent("destroy()", { currentState });

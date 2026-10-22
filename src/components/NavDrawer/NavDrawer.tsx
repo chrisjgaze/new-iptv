@@ -61,7 +61,8 @@ export default function NavDrawer(props) {
       return props.focusPage();
     }
 
-    navigate(page);
+    // Replace rather than push, so Back doesn't walk through every section you visited.
+    navigate(page, { replace: true });
   }
 
   const selectedButton = createMemo(() => {

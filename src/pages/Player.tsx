@@ -341,13 +341,16 @@ const Player = () => {
     return false;
   }
 
-  async function exitPlayer() {
+  let exiting = false;
+  function exitPlayer() {
+    if (exiting) return true;
+    exiting = true;
     console.log("Player exit requested", {
       routeId: params.id,
       state: getState()
     });
-    await saveWatchProgress();
-    await destroy();
+    void saveWatchProgress();
+    void destroy();
     navigate(-1);
     return true;
   }
@@ -461,8 +464,7 @@ const Player = () => {
       console.log("Player before init");
       init(parent);
       console.log("Player after init");
-      setPlayerInitialized(true);
-      void loadCurrentStream("mount");
+      setPlayerInitialized(true); // the route effect below performs the first load
     } catch (error) {
       const message =
         error instanceof Error ? error.message : JSON.stringify(error);
@@ -471,10 +473,14 @@ const Player = () => {
     }
   });
 
+  let lastLoadKey = "";
   createEffect(() => {
     const streamId = params.id;
     const routeSearch = location.search;
     if (!playerInitialized() || !streamId) return;
+    const loadKey = `${streamId}${routeSearch}`;
+    if (loadKey === lastLoadKey) return;
+    lastLoadKey = loadKey;
     console.log("Player route update trigger", {
       streamId,
       routeSearch
@@ -552,8 +558,10 @@ const Player = () => {
     if (saveProgressTimer) clearInterval(saveProgressTimer);
     if (controlsHideTimer) clearTimeout(controlsHideTimer);
     if (numericSeekTimer) clearTimeout(numericSeekTimer);
-    void saveWatchProgress();
-    destroy();
+    if (!exiting) {
+      void saveWatchProgress();
+      void destroy();
+    }
   });
 
   const progressWidth = 1240;

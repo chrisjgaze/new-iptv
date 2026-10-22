@@ -11,7 +11,7 @@ const App = (props) => {
         Menu: ["m"],
         Escape: ["Escape", 27],
         Backspace: ["Backspace", 8],
-        Back: ["b", "XF86Back", 10009],
+        Back: ["XF86Back", 10009],
         Left: ["ArrowLeft", 37],
         Right: ["ArrowRight", 39],
         Up: ["ArrowUp", 38],
@@ -21,7 +21,7 @@ const App = (props) => {
       {
         userKeyHoldMap: {
           EnterHold: ["Enter", 13],
-          BackHold: ["b", 66]
+          BackHold: ["XF86Back", 10009]
         } as unknown as KeyHoldMap,
         holdThreshold: 1000
       }

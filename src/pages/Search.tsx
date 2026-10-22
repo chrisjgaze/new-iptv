@@ -36,9 +36,11 @@ const SearchPage = () => {
   const [error, setError] = createSignal("");
   const [status, setStatus] = createSignal("Type at least 2 characters to search.");
   const [selectedTitle, setSelectedTitle] = createSignal("");
+  const [resultsVersion, setResultsVersion] = createSignal(0);
   let gridRef;
   let keyboardRef;
   let searchTimer;
+  let searchSeq = 0; // only the newest request may update the screen
 
   function updateBackground(item: any) {
     setSelectedTitle(item?.title || "");
@@ -46,8 +48,11 @@ const SearchPage = () => {
   }
 
   async function runSearch(currentQuery: string) {
+    if (searchTimer) clearTimeout(searchTimer);
+    const seq = ++searchSeq;
     const trimmed = currentQuery.trim();
     if (trimmed.length < 2) {
+      setSelectedTitle("");
       setResults([]);
       setError("");
       setStatus("Type at least 2 characters to search.");
@@ -60,22 +65,27 @@ const SearchPage = () => {
     setStatus(`Searching for "${trimmed}"...`);
     try {
       const nextResults = await searchProvider(trimmed);
+      // A slower, older request (e.g. "ma") must not overwrite newer results ("matrix").
+      if (seq !== searchSeq) return;
+      setSelectedTitle("");
       setResults(nextResults);
+      setResultsVersion((v) => v + 1); // fresh grid, selection back to the first tile
       if (nextResults.length) {
         setStatus(`${nextResults.length} result${nextResults.length === 1 ? "" : "s"}`);
-        updateBackground(nextResults[0]);
+        // Background follows the focused tile only; changing it per keystroke made the screen flash.
       } else {
         setStatus(`No results for "${trimmed}".`);
         setGlobalBackground(0x0b0b0fff);
       }
     } catch (searchError) {
+      if (seq !== searchSeq) return;
       const message = searchError instanceof Error ? searchError.message : String(searchError);
       setResults([]);
       setError(message);
       setStatus("Search failed.");
       setGlobalBackground(0x0b0b0fff);
     } finally {
-      setLoading(false);
+      if (seq === searchSeq) setLoading(false);
     }
   }
 
@@ -100,10 +110,10 @@ const SearchPage = () => {
 
     const keyId = String(key.key?.keyId || key.key?.title || "").toLowerCase();
     if (keyId === "search") {
-      void runSearch(query());
-      if (results().length) {
-        gridRef?.setFocus();
-      }
+      // Run now (cancelling the pending debounce), then move to results once they exist.
+      void runSearch(query()).then(() => {
+        if (results().length) gridRef?.setFocus();
+      });
       return true;
     }
 
@@ -162,7 +172,7 @@ const SearchPage = () => {
         <Keyboard ref={keyboardRef} width={760} formats={keyboardFormats} onEnter={onKeyboardEnter} onDown={() => results().length && gridRef?.setFocus()} />
       </Column>
 
-      <Show when={results().length}>
+      <Show when={results().length ? resultsVersion() : 0} keyed>
         <View x={980} y={150} width={780} height={820} clipping>
           <Text y={0} fontSize={30} fontWeight="bold">
             Results

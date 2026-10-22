@@ -44,6 +44,31 @@ const LeftNavWrapper = (props) => {
     return navDrawer.setFocus();
   }
 
+  const SECTION_ROOTS = ["/browse/all", "/tv", "/categories", "/series", "/search", "/recents"];
+  function handleBack() {
+    const path = location.pathname;
+    if (path === "/" || path === "/browse/all") {
+      // Home: first Back opens the menu; Back again from the menu closes the app
+      // (on the TV that returns to whatever opened it, e.g. CleanFrame).
+      if (!navDrawer.states.has("focus")) {
+        focusNavDrawer();
+        return true;
+      }
+      try {
+        (window as any).tizen?.application?.getCurrentApplication?.().exit();
+      } catch (e) {
+        console.warn("App exit failed", e);
+      }
+      return true;
+    }
+    if (SECTION_ROOTS.indexOf(path) >= 0) {
+      navigate("/browse/all", { replace: true });
+      return true;
+    }
+    navigate(-1);
+    return true;
+  }
+
   const [showWidgets, setShowWidgets] = createSignal(true);
   const location = useLocation();
   const showOnPaths = ["/browse", "/entity", "/categories", "/tv", "/search", "/series", "/recents"];
@@ -101,7 +126,7 @@ const LeftNavWrapper = (props) => {
       onAnnouncer={() => (announcer.enabled = !announcer.enabled)}
       onLast={() => history.back()}
       onMenu={() => navigate("/")}
-      onBack={() => navigate(-1)}
+      onBack={handleBack}
       style={{ width: 1920, height: 1080 }}
       onBackspace={focusNavDrawer}
       onLeft={focusNavDrawer}

@@ -11,7 +11,7 @@ import { createEffect, createMemo, createResource, on, createSignal } from "soli
 import { TileRow, Button } from "../components";
 import { setGlobalBackground } from "../state";
 import ContentBlock from "../components/ContentBlock";
-import { useNavigate, useParams } from "@solidjs/router";
+import { useLocation, useNavigate, useParams } from "@solidjs/router";
 import styles from "../styles";
 import { getImageUrl } from "../api";
 import { getWatchedProgress, type WatchedMap } from "../api/providers/watchProgress";
@@ -75,16 +75,12 @@ const Entity = (props) => {
     setBackdropAlpha(0);
   }
 
+  // Read from the router (reactive). Reading window.location here was evaluated once, so
+  // moving from one movie page to another kept the first movie's stream_id/ext and played
+  // the wrong file (or a file with the wrong extension).
+  const routeLocation = useLocation();
   function getQueryParam(key: string) {
-    const search = window.location.search || "";
-    if (search.includes(key)) {
-      return new URLSearchParams(search).get(key);
-    }
-    const hash = window.location.hash || "";
-    const queryIndex = hash.indexOf("?");
-    if (queryIndex === -1) return null;
-    const hashQuery = hash.slice(queryIndex + 1);
-    return new URLSearchParams(hashQuery).get(key);
+    return new URLSearchParams(routeLocation.search || "").get(key);
   }
 
   const streamId = createMemo(() => getQueryParam("stream_id") || "");
