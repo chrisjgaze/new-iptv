@@ -1,9 +1,10 @@
 import type { Tile } from "../formatters/ItemFormatter";
 import { getImageUrl, proxyRemoteImage } from "../index";
+import { getProviderUrl } from "../backend";
 
 const CATEGORY_MOVIES_BASE =
   import.meta.env.VITE_CATEGORY_MOVIES_BASE ||
-  "http://192.168.1.46:5000";
+  "http://192.168.1.242:5000";
 
 type RawMovie = {
   stream_id?: string | number;
@@ -60,19 +61,14 @@ function pickBackdrop(item: RawMovie, posterUrl: string) {
   return "";
 }
 
-const STREAM_BASE_URL =
-  import.meta.env.VITE_STREAM_BASE_URL || "http://YOUR_BASE_URL";
-const STREAM_USERNAME =
-  import.meta.env.VITE_STREAM_USERNAME || "YOUR_USERNAME";
-const STREAM_PASSWORD =
-  import.meta.env.VITE_STREAM_PASSWORD || "YOUR_PASSWORD";
-
-function buildStreamUrl(streamId: string | number, ext?: string) {
+function buildStreamUrl(providerUrl: string, streamId: string | number, ext?: string) {
   if (!streamId || !ext) return "";
-  return `${STREAM_BASE_URL}/movie/${STREAM_USERNAME}/${STREAM_PASSWORD}/${streamId}.${ext}`;
+  const username = import.meta.env.VITE_STREAM_USERNAME || "YOUR_USERNAME";
+  const password = import.meta.env.VITE_STREAM_PASSWORD || "YOUR_PASSWORD";
+  return `${providerUrl}/movie/${username}/${password}/${streamId}.${ext}`;
 }
 
-function toTiles(items: RawMovie[]): Tile[] {
+function toTiles(items: RawMovie[], providerUrl: string): Tile[] {
   return items
     .map((item, index) => {
       const title = item.name || `Movie ${index + 1}`;
@@ -81,7 +77,7 @@ function toTiles(items: RawMovie[]): Tile[] {
       const img = proxyImage(item.stream_icon);
       const backdrop = pickBackdrop(item, img);
       const rating = item.rating ? `Rating ${item.rating}` : "";
-      const streamUrl = buildStreamUrl(id, item.container_extension);
+      const streamUrl = buildStreamUrl(providerUrl, id, item.container_extension);
       const ext = item.container_extension || "mkv";
       return {
         src: img,
@@ -118,6 +114,7 @@ export default function categoryMoviesProvider(categoryId: string) {
       throw new Error(`Failed to load category movies (${response.status})`);
     }
     const payload = await response.json();
-    return toTiles(normalizeMovies(payload));
+    const providerUrl = await getProviderUrl();
+    return toTiles(normalizeMovies(payload), providerUrl);
   };
 }

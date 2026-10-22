@@ -32,7 +32,7 @@ type SeriesInfoPayload = {
   backdrop_path?: string[] | string;
 };
 
-const SERIES_INFO_BASE = import.meta.env.VITE_SERIES_INFO_URL || "http://192.168.1.46:5000/api/series";
+const SERIES_INFO_BASE = import.meta.env.VITE_SERIES_INFO_URL || "http://192.168.1.242:5000/api/series";
 
 function backdropFor(payload: SeriesInfoPayload) {
   if (Array.isArray(payload.backdrop_path)) {

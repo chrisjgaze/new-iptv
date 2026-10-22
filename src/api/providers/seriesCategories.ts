@@ -1,6 +1,6 @@
 import type { Tile } from "../formatters/ItemFormatter";
 
-const SERIES_CATEGORIES_URL = import.meta.env.VITE_SERIES_CATEGORIES_URL || "http://192.168.1.46:5000/get_series_categories";
+const SERIES_CATEGORIES_URL = import.meta.env.VITE_SERIES_CATEGORIES_URL || "http://192.168.1.242:5000/get_series_categories";
 
 type RawSeriesCategory = {
   category_id?: string | number;

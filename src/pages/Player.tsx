@@ -8,10 +8,10 @@ import {
 import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { setGlobalBackground } from "../state";
 import {
-  startLiveHlsStream,
   updateWatchProgress
 } from "../api/providers/watchProgress";
 import { getPendingPlayerMetadata } from "../utils/playerMetadata";
+import { getProviderUrl } from "../api/backend";
 import {
   init,
   load,
@@ -60,8 +60,6 @@ const Player = () => {
   const [playerInitialized, setPlayerInitialized] = createSignal(false);
   const [volumePercent, setVolumePercent] = createSignal(100);
   const [isMuted, setIsMuted] = createSignal(false);
-  const streamBase =
-    import.meta.env.VITE_STREAM_BASE_URL || "http://YOUR_BASE_URL";
   const streamUser = import.meta.env.VITE_STREAM_USERNAME || "YOUR_USERNAME";
   const streamPass = import.meta.env.VITE_STREAM_PASSWORD || "YOUR_PASSWORD";
   const proxyBase =
@@ -404,16 +402,9 @@ const Player = () => {
     setDebugError("");
 
     try {
-      let streamUrl = `${streamBase}/${stream.streamType}/${streamUser}/${streamPass}/${stream.streamId}.${stream.ext}`;
-
-      if (stream.streamType === "live") {
-        const livePayload = await startLiveHlsStream({
-          streamId: stream.streamId,
-          containerExtension: stream.ext
-        });
-        streamUrl = livePayload.playlist_url || "";
-        console.log("Player live HLS payload", livePayload);
-      }
+      const providerUrl = await getProviderUrl();
+      const streamPath = stream.streamType === "live" ? "" : `/${stream.streamType}`;
+      const streamUrl = `${providerUrl}${streamPath}/${streamUser}/${streamPass}/${stream.streamId}.${stream.ext}`;
 
       setDebugUrl(streamUrl);
       console.log("Player loadCurrentStream", {

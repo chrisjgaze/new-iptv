@@ -1,5 +1,5 @@
 const WATCH_PROGRESS_BASE =
-  import.meta.env.VITE_WATCH_PROGRESS_BASE_URL || "http://192.168.1.46:5000";
+  import.meta.env.VITE_WATCH_PROGRESS_BASE_URL || "http://192.168.1.242:5000";
 
 export type WatchedEntry = {
   watched_pct?: number;

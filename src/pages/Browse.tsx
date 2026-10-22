@@ -38,6 +38,7 @@ const Browse = (props) => {
   let recentsActionRowRef;
   const location = useLocation();
   const isCategoriesList = () => location.pathname === "/categories";
+  const isLiveCategoriesList = () => location.pathname === "/tv";
   const isSeriesCategoriesList = () => location.pathname === "/series";
   const isCategoryMovies = useMatch(() => "/categories/:id");
   const isRecentsRoute = () => location.pathname === "/recents";
@@ -324,10 +325,10 @@ const Browse = (props) => {
       });
       return;
     }
-    if ((isCategoriesList() || isSeriesCategoriesList()) && item.title) {
+    if ((isCategoriesList() || isLiveCategoriesList() || isSeriesCategoriesList()) && item.title) {
       setHero({
         title: item.title,
-        description: isSeriesCategoriesList() ? "Series category" : "Category"
+        description: isSeriesCategoriesList() ? "Series category" : isLiveCategoriesList() ? "Live TV category" : "Category"
       });
     }
   }
@@ -501,6 +502,8 @@ const Browse = (props) => {
               ? `All Trending ${props.params.filter}`
               : isCategoriesList()
                 ? "Categories"
+                : isLiveCategoriesList()
+                  ? "Live TV Categories"
                 : isSeriesCategoriesList()
                   ? "Series Categories"
                   : isCategoryMovies()
@@ -521,7 +524,7 @@ const Browse = (props) => {
         >
           {(item) => {
             const current = item();
-            if (isCategoriesList() || isSeriesCategoriesList()) {
+            if (isCategoriesList() || isLiveCategoriesList() || isSeriesCategoriesList()) {
               return (
                 <View
                   style={styles.Thumbnail}

@@ -1,7 +1,7 @@
 import type { Tile } from "../formatters/ItemFormatter";
 import { proxyRemoteImage } from "../index";
 
-const SERIES_BASE = import.meta.env.VITE_SERIES_BASE_URL || "http://192.168.1.46:5000";
+const SERIES_BASE = import.meta.env.VITE_SERIES_BASE_URL || "http://192.168.1.242:5000";
 
 type RawSeries = {
   series_id?: string | number;

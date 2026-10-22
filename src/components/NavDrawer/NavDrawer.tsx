@@ -68,7 +68,7 @@ export default function NavDrawer(props) {
     const base = 366;
     const step = 90;
     let index = 0;
-    if (useMatch(() => "/browse/tv")()) index = 1;
+    if (useMatch(() => "/tv")() || useMatch(() => "/tv/:id")()) index = 1;
     if (useMatch(() => "/categories")() || useMatch(() => "/categories/:id")())
       index = 2;
     if (useMatch(() => "/series")() || useMatch(() => "/series/:id")() || useMatch(() => "/series/show/:id")())
@@ -120,7 +120,7 @@ export default function NavDrawer(props) {
           icon="tv"
           iconColor={"#fff"}
           announce={["TV Browse", "button"]}
-          onEnter={() => handleNavigate("/browse/tv")}
+          onEnter={() => handleNavigate("/tv")}
         >
           TV
         </NavButton>

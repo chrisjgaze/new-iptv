@@ -1,7 +1,7 @@
 import type { Tile } from "../formatters/ItemFormatter";
 import { proxyRemoteImage } from "../index";
 
-const SEARCH_BASE = import.meta.env.VITE_SEARCH_URL || "http://192.168.1.46:5000/api/search";
+const SEARCH_BASE = import.meta.env.VITE_SEARCH_URL || "http://192.168.1.242:5000/api/search";
 
 type RawSearchItem = {
   media_type?: string;

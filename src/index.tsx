@@ -35,6 +35,8 @@ import { seriesCategoriesPreload } from "./api/seriesCategoriesPreload";
 import { seriesCategoryPreload } from "./api/seriesCategoryPreload";
 import { recentlyWatchedPreload } from "./api/recentlyWatchedPreload";
 import { entityPreload } from "./api/entityPreload";
+import { liveCategoriesPreload } from "./api/liveCategoriesPreload";
+import { liveStreamsPreload } from "./api/liveStreamsPreload";
 import LeftNavWrapper from "./pages/LeftNavWrapper";
 import { startRemoteBridge } from "./remoteBridge";
 import theme from "theme";
@@ -190,6 +192,18 @@ render(() => {
             path="categories"
             component={Browse}
             preload={categoriesPreload}
+          />
+          <KeepAliveRoute
+            id="live-categories"
+            path="tv"
+            component={Browse}
+            preload={liveCategoriesPreload}
+          />
+          <KeepAliveRoute
+            id="live-streams"
+            path="tv/:id"
+            component={Browse}
+            preload={liveStreamsPreload}
           />
           <KeepAliveRoute
             id="search"
