@@ -93,6 +93,7 @@ const updateHtml5DebugOverlay = () => {
 
 
 const resetPlaybackState = () => {
+  lastPlayerError = "";
   currentUrl = null;
   lastBufferStartMs = null;
   lastBufferDurationMs = 0;
@@ -119,11 +120,29 @@ const pushDebugEvent = (message, details) => {
   return entry;
 };
 
+let lastPlayerError = "";
+const describeError = (details) => {
+  if (!details) return "";
+  const err = details.err || details;
+  const parts = [];
+  if (details.type) parts.push(String(details.type));
+  if (err && err.name) parts.push(String(err.name));
+  if (err && err.message) parts.push(String(err.message));
+  if (details.message && typeof details.message === "string") parts.push(details.message);
+  if (details.data && typeof details.data !== "object") parts.push(String(details.data));
+  return parts.filter((p, i, a) => p && a.indexOf(p) === i).join(" / ");
+};
 const setLastError = (message, details) => {
+  const detail = describeError(details);
+  // Keep the most specific AVPlay error (onerror type) next to later generic failures.
+  if (/AVPlay Error/.test(message) && detail) lastPlayerError = detail;
   lastError = {
     at: new Date().toISOString(),
     message,
-    details
+    details,
+    detail: [detail, lastPlayerError && lastPlayerError !== detail ? `player: ${lastPlayerError}` : ""]
+      .filter(Boolean)
+      .join(" | ")
   };
   if (details === undefined) console.error(`[AVPlay] ${message}`);
   else console.error(`[AVPlay] ${message}`, details);

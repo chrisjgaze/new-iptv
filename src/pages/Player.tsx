@@ -504,7 +504,7 @@ const Player = () => {
     setIsMuted(!!getMuted?.());
     setDebugError(
       lastError
-        ? `${lastError.at} ${lastError.message}`
+        ? `${lastError.at} ${lastError.message}${lastError.detail ? ` — ${lastError.detail}` : ""}`
         : ""
     );
     setDebugEvents(
