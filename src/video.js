@@ -10,6 +10,39 @@ const debugEvents = [];
 let transitionLock = Promise.resolve();
 let backend = "none";
 let loadGeneration = 0;
+
+// ---- Subtitles (Samsung AVPlay only) ----
+// AVPlay does not draw subtitles: it reports each line through onsubtitlechange and the
+// app renders it. Text tracks (SRT/ASS/etc. inside MKV/MP4) work; picture subtitles (PGS) do not.
+let subtitleText = "";
+let subtitleClearTimer = null;
+let subtitleTrackIndex = -1; // -1 = off
+
+const cleanSubtitle = (raw) =>
+  String(raw || "")
+    .replace(/\\N/g, "\n")              // ASS line breaks
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/\{[^}]*\}/g, "")            // ASS override tags {\i1}
+    .replace(/<[^>]+>/g, "")               // <i>, <font ...>
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+
+const setSubtitleText = (text, durationMs) => {
+  if (subtitleClearTimer) clearTimeout(subtitleClearTimer);
+  subtitleClearTimer = null;
+  subtitleText = subtitleTrackIndex < 0 ? "" : cleanSubtitle(text);
+  const ms = Number(durationMs);
+  if (subtitleText && ms > 0) {
+    subtitleClearTimer = setTimeout(() => {
+      subtitleText = "";
+      subtitleClearTimer = null;
+    }, ms);
+  }
+};
 // Large MP4s with their index (moov atom) at the end of the file can take well over
 // 15 s to prepare on a 2019-2020 TV over a slow provider. Give them time.
 const PREPARE_TIMEOUT_MS = 45000;
@@ -94,6 +127,8 @@ const updateHtml5DebugOverlay = () => {
 
 const resetPlaybackState = () => {
   lastPlayerError = "";
+  subtitleTrackIndex = -1;
+  setSubtitleText("");
   currentUrl = null;
   lastBufferStartMs = null;
   lastBufferDurationMs = 0;
@@ -476,6 +511,9 @@ export const load = async (config) => {
         state.preparing = false;
         setLastError("AVPlay Error", { type, data, state: getState() });
       },
+      onsubtitlechange: (duration, text) => {
+        setSubtitleText(text, duration);
+      },
       onerrormsg: (message) => {
         state.buffering = false;
         state.preparing = false;
@@ -484,6 +522,11 @@ export const load = async (config) => {
       };
       webapis.avplay.setListener(listener);
       pushDebugEvent("listener attached");
+      try {
+        webapis.avplay.setSilentSubtitle(true);
+      } catch (e) {
+        pushDebugEvent("setSilentSubtitle unavailable", e);
+      }
 
       try {
         webapis.avplay.setDisplayMethod("PLAYER_DISPLAY_MODE_FULL_SCREEN");
@@ -677,6 +720,71 @@ export const getState = () => {
 };
 
 export const getBackend = () => backend;
+
+/** Text subtitle tracks in the current file: [{ index, language, label }]. Needs READY/PLAYING/PAUSED. */
+export const getSubtitleTracks = () => {
+  if (!isTizenBackend() || !webapis.avplay.getTotalTrackInfo) return [];
+  try {
+    const all = webapis.avplay.getTotalTrackInfo() || [];
+    const tracks = [];
+    for (let i = 0; i < all.length; i += 1) {
+      const t = all[i];
+      if (!t || t.type !== "TEXT") continue;
+      let extra = {};
+      try {
+        extra = typeof t.extra_info === "string" ? JSON.parse(t.extra_info) : t.extra_info || {};
+      } catch (e) {
+        extra = {};
+      }
+      const language = String(extra.track_lang || extra.language || "").trim();
+      tracks.push({ index: t.index, language, label: languageLabel(language) || `Track ${tracks.length + 1}` });
+    }
+    pushDebugEvent("subtitle tracks", tracks);
+    return tracks;
+  } catch (e) {
+    pushDebugEvent("getTotalTrackInfo failed", e);
+    return [];
+  }
+};
+
+/** Show subtitle track `index`, or pass -1 to turn subtitles off. Returns true on success. */
+export const setSubtitleTrack = (index) => {
+  if (!isTizenBackend()) return false;
+  try {
+    if (index < 0) {
+      webapis.avplay.setSilentSubtitle(true);
+      subtitleTrackIndex = -1;
+      setSubtitleText("");
+    } else {
+      webapis.avplay.setSelectTrack("TEXT", index);
+      webapis.avplay.setSilentSubtitle(false);
+      subtitleTrackIndex = index;
+      setSubtitleText("");
+    }
+    pushDebugEvent("subtitle track set", { index });
+    return true;
+  } catch (e) {
+    setLastError("Subtitle change failed", e);
+    return false;
+  }
+};
+
+export const getSubtitleText = () => subtitleText;
+
+const LANGUAGES = {
+  en: "English", eng: "English", nl: "Dutch", nld: "Dutch", dut: "Dutch", ar: "Arabic", ara: "Arabic",
+  fr: "French", fra: "French", fre: "French", de: "German", deu: "German", ger: "German",
+  es: "Spanish", spa: "Spanish", it: "Italian", ita: "Italian", pt: "Portuguese", por: "Portuguese",
+  tr: "Turkish", tur: "Turkish", hi: "Hindi", hin: "Hindi", ru: "Russian", rus: "Russian",
+  pl: "Polish", pol: "Polish", sv: "Swedish", swe: "Swedish", da: "Danish", dan: "Danish",
+  no: "Norwegian", nor: "Norwegian", fi: "Finnish", fin: "Finnish", el: "Greek", gre: "Greek", ell: "Greek",
+  zh: "Chinese", chi: "Chinese", zho: "Chinese", ja: "Japanese", jpn: "Japanese", ko: "Korean", kor: "Korean"
+};
+function languageLabel(code) {
+  if (!code) return "";
+  const key = code.toLowerCase().split(/[-_]/)[0];
+  return LANGUAGES[key] || code.toUpperCase();
+}
 export const getBuffering = () => state.buffering;
 export const getCurrentUrl = () => currentUrl;
 export const getPreparing = () => state.preparing;

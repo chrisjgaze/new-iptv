@@ -133,7 +133,9 @@ function registerTizenRemoteKeys() {
     : [];
   console.log("Tizen supported keys:", supportedKeys);
 
-  const numericKeys = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+  const numericKeys = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+    // colour keys and CC cycle subtitles in the player
+    "ColorF0Red", "ColorF1Green", "ColorF2Yellow", "ColorF3Blue", "Caption"];
   const supportedDigitLikeKeys = supportedKeys
     .map((entry) => entry?.name)
     .filter((name) => typeof name === "string" && /(^\d$|Digit\d|Numpad\d)/.test(name));

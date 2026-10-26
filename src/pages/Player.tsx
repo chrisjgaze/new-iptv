@@ -31,9 +31,40 @@ import {
   adjustVolume,
   getBackend,
   getLastError,
-  getDebugEvents
+  getDebugEvents,
+  getSubtitleTracks,
+  setSubtitleTrack,
+  getSubtitleText
 } from "../video";
+
+// Remote keys that cycle subtitles: Red/Green/Yellow/Blue colour keys, the CC/Caption key,
+// and "c" on a computer keyboard for browser testing.
+const SUBTITLE_KEYCODES = new Set([403, 404, 405, 406, 10221]);
+const SUBTITLE_PREF_KEY = "cjgflix.subtitleLanguage"; // "off" or a language code / track label
+
+function readSubtitlePref(): string {
+  try {
+    return window.localStorage.getItem(SUBTITLE_PREF_KEY) || "off";
+  } catch (e) {
+    return "off";
+  }
+}
+function writeSubtitlePref(value: string) {
+  try {
+    window.localStorage.setItem(SUBTITLE_PREF_KEY, value);
+  } catch (e) {
+    /* storage unavailable: keep the choice for this session only */
+  }
+}
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
+
+const SUBTITLE_LINE_HEIGHT = 56;
+// Rough line count for sizing the subtitle band: explicit breaks plus wrapping at ~58 characters.
+function subtitleLineCount(text: string) {
+  return text
+    .split("\n")
+    .reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 58)), 0);
+}
 
 const Player = () => {
   let parent;
@@ -60,6 +91,12 @@ const Player = () => {
   const [playerInitialized, setPlayerInitialized] = createSignal(false);
   const [volumePercent, setVolumePercent] = createSignal(100);
   const [isMuted, setIsMuted] = createSignal(false);
+  const [subtitleTracks, setSubtitleTracks] = createSignal<
+    { index: number; language: string; label: string }[]
+  >([]);
+  const [subtitlePos, setSubtitlePos] = createSignal(-1); // position in subtitleTracks, -1 = off
+  const [subtitleLine, setSubtitleLine] = createSignal("");
+  let subtitleTracksLoaded = false;
   const streamUser = import.meta.env.VITE_STREAM_USERNAME || "YOUR_USERNAME";
   const streamPass = import.meta.env.VITE_STREAM_PASSWORD || "YOUR_PASSWORD";
   const proxyBase =
@@ -341,6 +378,57 @@ const Player = () => {
     return false;
   }
 
+  function subtitleName(pos: number) {
+    const t = subtitleTracks()[pos];
+    return t ? t.label : "Off";
+  }
+
+  function loadSubtitleTracks() {
+    subtitleTracksLoaded = true;
+    const tracks = getSubtitleTracks?.() || [];
+    setSubtitleTracks(tracks);
+    const pref = readSubtitlePref();
+    if (pref === "off" || !tracks.length) return;
+    const pos = tracks.findIndex(
+      (t) => t.language.toLowerCase() === pref.toLowerCase() || t.label === pref
+    );
+    if (pos >= 0 && setSubtitleTrack(tracks[pos].index)) {
+      setSubtitlePos(pos);
+      setSeekNotice(`Subtitles: ${tracks[pos].label}`);
+      revealControls();
+    }
+  }
+
+  function cycleSubtitles() {
+    if (!subtitleTracksLoaded && READY_STATES.has(getState?.() || "")) loadSubtitleTracks();
+    if (!subtitleTracks().length) {
+      setSeekNotice("No subtitles in this file");
+      revealControls();
+      return true;
+    }
+    const next = subtitlePos() + 1 >= subtitleTracks().length ? -1 : subtitlePos() + 1;
+    const ok = setSubtitleTrack(next < 0 ? -1 : subtitleTracks()[next].index);
+    if (ok) {
+      setSubtitlePos(next);
+      if (next < 0) setSubtitleLine("");
+      writeSubtitlePref(next < 0 ? "off" : subtitleTracks()[next].language || subtitleTracks()[next].label);
+      setSeekNotice(
+        next < 0 ? "Subtitles off" : `Subtitles: ${subtitleName(next)} (${next + 1}/${subtitleTracks().length})`
+      );
+    } else {
+      setSeekNotice("Couldn't change subtitles");
+    }
+    revealControls();
+    return true;
+  }
+
+  function handlePlayerKey(event: KeyboardEvent) {
+    if (!event.repeat && (SUBTITLE_KEYCODES.has(event.keyCode) || event.key === "c")) {
+      return cycleSubtitles();
+    }
+    return handleNumericSeek(event);
+  }
+
   let exiting = false;
   function exitPlayer() {
     if (exiting) return true;
@@ -397,6 +485,10 @@ const Player = () => {
     }
 
     hasAppliedInitialSeek = false;
+    subtitleTracksLoaded = false;
+    setSubtitleTracks([]);
+    setSubtitlePos(-1);
+    setSubtitleLine("");
     setSeekNotice("");
     setPendingSeekMinutes("");
     setCurrentTimeSec(0);
@@ -513,6 +605,9 @@ const Player = () => {
         .reverse()
         .map((entry) => `${entry.at.slice(11, 19)} ${entry.message}`)
     );
+    setSubtitleLine(subtitlePos() >= 0 ? getSubtitleText?.() || "" : "");
+    // Track info is available once playing; read it once per film.
+    if (!subtitleTracksLoaded && state === "PLAYING") loadSubtitleTracks();
     const timeSec = getCurrentTime?.() || 0;
     setCurrentTimeSec(timeSec);
     setDebugTime(formatTime(timeSec));
@@ -575,7 +670,7 @@ const Player = () => {
       onDown={() => adjustPlayerVolume(-0.1) || (revealControls(), true)}
       onLeft={() => seekBy(-SEEK_STEP_SECONDS)}
       onRight={() => seekBy(SEEK_STEP_SECONDS)}
-      onKeyPress={handleNumericSeek}
+      onKeyPress={handlePlayerKey}
     >
       {!isReady() && (
         <View x={0} y={0} width={1920} height={1080} color={0x000000cc}>
@@ -590,16 +685,46 @@ const Player = () => {
           </Text>
         </View>
       )}
+      {subtitleLine() && (
+        <View
+          x={160}
+          y={
+            (controlsVisible() ? 846 : 1020) -
+            subtitleLineCount(subtitleLine()) * SUBTITLE_LINE_HEIGHT -
+            24
+          }
+          width={1600}
+          height={subtitleLineCount(subtitleLine()) * SUBTITLE_LINE_HEIGHT + 24}
+          color={0x000000a0}
+        >
+          <Text
+            x={0}
+            y={12}
+            width={1600}
+            contain="width"
+            textAlign="center"
+            fontSize={44}
+            lineHeight={SUBTITLE_LINE_HEIGHT}
+            color={0xffffffff}
+          >
+            {subtitleLine()}
+          </Text>
+        </View>
+      )}
       {controlsVisible() && (
         <View x={80} y={860} width={1760} height={170} color={0x101820e6}>
           <Text x={40} y={24} fontSize={32} fontWeight="bold">
             {debugState() === "PAUSED" ? "Paused" : "Playing"}
           </Text>
-          <Text x={250} y={28} fontSize={22}>
-            {`Backend ${debugBackend()}  Left/Right seek ${SEEK_STEP_SECONDS}s  Up/Down volume ${volumePercent()}%${isMuted() ? " muted" : ""}`}
+          <Text x={250} y={10} fontSize={22}>
+            {`OK ${debugState() === "PAUSED" ? "play" : "pause"}   Left/Right seek ${SEEK_STEP_SECONDS}s   Up/Down volume ${volumePercent()}%${isMuted() ? " muted" : ""}`}
           </Text>
-          <Text x={520} y={28} fontSize={22}>
-            {`Enter ${debugState() === "PAUSED" ? "Play" : "Pause"}`}
+          <Text x={250} y={40} fontSize={22}>
+            {`Subtitles (yellow/CC): ${
+              subtitleTracks().length
+                ? `${subtitleName(subtitlePos())} - ${subtitleTracks().length} available`
+                : "none in this file"
+            }   Backend ${debugBackend()}`}
           </Text>
           {pendingSeekMinutes() && (
             <Text x={860} y={28} fontSize={22}>
