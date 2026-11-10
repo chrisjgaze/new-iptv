@@ -98,10 +98,10 @@ const Entity = (props) => {
     return {
       mediaType: "movie" as const,
       media_id: streamId(),
-      tmdbId: params.id || "",
+      tmdbId: params.id && params.id !== "0" ? params.id : "",
       title: data.heroContent?.title || data.title || "",
       overview: data.heroContent?.description || data.overview || "",
-      posterUrl: data.poster_path ? getImageUrl(data.poster_path) : "",
+      posterUrl: data.poster_path ? getImageUrl(data.poster_path) : getQueryParam("poster") || "",
       backdropUrl: data.backgroundImage || "",
       containerExtension: ext()
     };
@@ -171,7 +171,14 @@ const Entity = (props) => {
    * However this causes problems with elements which have internal state like Row & Column because the selected does not get reset.
    */
   return (
-    <Show when={props.data.entity()}>
+    <Show
+      when={props.data.entity()}
+      fallback={
+        <Text x={0} y={520} width={1920} fontSize={36} textAlign="center" contain="width">
+          Loading...
+        </Text>
+      }
+    >
       <View
         x={170}
         onUp={() => entityActions.setFocus()}
@@ -256,7 +263,7 @@ const Entity = (props) => {
           scroll="none"
           zIndex={5}
         >
-          <Show when={props.data.recommendations() && props.data.credits()}>
+          <Show when={props.data.recommendations()?.length}>
             <Text skipFocus style={styles.RowTitle}>
               Recommendations
             </Text>
@@ -267,6 +274,8 @@ const Entity = (props) => {
               items={props.data.recommendations()}
               width={1620}
             />
+          </Show>
+          <Show when={props.data.credits()?.length}>
             <Text skipFocus style={styles.RowTitle}>
               Cast and Crew
             </Text>

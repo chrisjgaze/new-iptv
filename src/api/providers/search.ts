@@ -1,3 +1,4 @@
+import { movieHref } from "../movieHref";
 import type { Tile } from "../formatters/ItemFormatter";
 import { proxyRemoteImage } from "../index";
 
@@ -68,15 +69,14 @@ function backdropFor(item: RawSearchItem, poster: string) {
   );
 }
 
-function hrefFor(item: RawSearchItem, tmdbId: string, fallbackId: string, ext: string) {
+function hrefFor(item: RawSearchItem, tmdbId: string, fallbackId: string, ext: string, title = "", poster = "") {
   if (item.media_type === "series") {
     return `/series/show/${fallbackId}`;
   }
   if (item.media_type === "channel") {
     return `/player/${fallbackId}?type=live&ext=${ext}`;
   }
-  if (!tmdbId) return "";
-  return `/entity/movie/${tmdbId}?stream_id=${fallbackId}&ext=${ext}`;
+  return movieHref({ tmdbId, streamId: fallbackId, ext, title, poster });
 }
 
 function entityTypeFor(item: RawSearchItem) {
@@ -99,7 +99,7 @@ function toTile(item: RawSearchItem, index: number): Tile | null {
     src: poster,
     tileSrc: poster,
     backdrop,
-    href: hrefFor(item, tmdbId, fallbackId, ext),
+    href: hrefFor(item, tmdbId, fallbackId, ext, title, poster),
     shortTitle: title,
     title,
     overview: item.plot || item.overview || item.description || "",

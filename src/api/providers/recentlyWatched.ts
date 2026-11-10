@@ -1,3 +1,4 @@
+import { movieHref } from "../movieHref";
 import type { Tile } from "../formatters/ItemFormatter";
 import { getRecentlyWatched, type RecentEntry } from "./watchProgress";
 import { proxyRemoteImage } from "../index";
@@ -12,7 +13,7 @@ function hrefFor(item: RecentEntry) {
   }
 
   if (item.tmdb_id) {
-    return `/entity/movie/${item.tmdb_id}?stream_id=${mediaId}&ext=${ext}`;
+    return movieHref({ tmdbId: item.tmdb_id, streamId: mediaId, ext, title: item.title, poster: item.poster_url });
   }
 
   const query = new URLSearchParams({

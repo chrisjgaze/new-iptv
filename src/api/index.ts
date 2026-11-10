@@ -39,6 +39,7 @@ export function proxyRemoteImage(url?: string) {
 export function getImageUrl(path: string, posterSize: string = basePosterSize) {
   if (!path) return "";
   const base = imageProxyBase ? normalizeBase(imageProxyBase) : baseImageUrl;
+  if (!base) return "";
   return base + posterSize + path;
 }
 
@@ -50,11 +51,21 @@ function get(path: string, params: RequestInit = {}) {
   }
 }
 
+const TMDB_TIMEOUT_MS = 10000;
+
 function _get(path: string, params: RequestInit = {}) {
-  return fetch(API_BASE + path, {
+  // No AbortController on 2019 TVs (Chromium 63), so race a timer instead.
+  const request = fetch(API_BASE + path, {
     ...defaultFetchParams,
     ...params
-  }).then((r) => r.json());
+  }).then((r) => {
+    if (!r.ok) throw new Error(`TMDB ${r.status} for ${path}`);
+    return r.json();
+  });
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`TMDB timed out for ${path}`)), TMDB_TIMEOUT_MS)
+  );
+  return Promise.race([request, timeout]);
 }
 
 function loadConfig() {

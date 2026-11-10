@@ -1,3 +1,4 @@
+import { movieHref } from "../movieHref";
 import type { Tile } from "../formatters/ItemFormatter";
 import { getImageUrl, proxyRemoteImage } from "../index";
 import { getProviderUrl } from "../backend";
@@ -83,9 +84,8 @@ function toTiles(items: RawMovie[], providerUrl: string): Tile[] {
         src: img,
         tileSrc: img,
         backdrop: backdrop || "",
-        href: tmdbId
-          ? `/entity/movie/${tmdbId}?stream_id=${id}&ext=${ext}`
-          : "",
+        // Always clickable: without a TMDB id the page uses the provider's title/poster.
+        href: movieHref({ tmdbId, streamId: id, ext, title, poster: img }),
         shortTitle: title,
         title,
         overview: "",
