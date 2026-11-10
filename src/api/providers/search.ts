@@ -62,7 +62,8 @@ function imageFor(item: RawSearchItem) {
 function backdropFor(item: RawSearchItem, poster: string) {
   return (
     proxyRemoteImage(
-      item.backdrop_path_tmdb || item.backdrop_path || item.backdrop || item.cover_big || ""
+      item.backdrop_path_tmdb || item.backdrop_path || item.backdrop || item.cover_big || "",
+      1280
     ) ||
     poster ||
     ""

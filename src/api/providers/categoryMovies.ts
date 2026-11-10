@@ -29,9 +29,9 @@ function normalizeMovies(payload: unknown): RawMovie[] {
   return [];
 }
 
-function proxyImage(src?: string) {
+function proxyImage(src?: string, width = 342) {
   if (!src) return "";
-  if (!src.includes("image.tmdb.org/t/p/")) return proxyRemoteImage(src);
+  if (!src.includes("image.tmdb.org/t/p/")) return proxyRemoteImage(src, width);
   const proxyBase = import.meta.env.VITE_TMDB_IMAGE_PROXY;
   if (!proxyBase) return src;
   const base = proxyBase.endsWith("/") ? proxyBase : `${proxyBase}/`;
@@ -50,7 +50,7 @@ function pickBackdrop(item: RawMovie, posterUrl: string) {
   if (!candidate || candidate === item.stream_icon) return "";
 
   if (candidate.startsWith("http")) {
-    return proxyImage(candidate);
+    return proxyImage(candidate, 1280);
   }
 
   if (candidate.startsWith("/")) {

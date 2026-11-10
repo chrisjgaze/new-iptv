@@ -36,9 +36,9 @@ const SERIES_INFO_BASE = import.meta.env.VITE_SERIES_INFO_URL || "http://192.168
 
 function backdropFor(payload: SeriesInfoPayload) {
   if (Array.isArray(payload.backdrop_path)) {
-    return proxyRemoteImage(payload.backdrop_path[0] || payload.info?.cover || "");
+    return proxyRemoteImage(payload.backdrop_path[0] || payload.info?.cover || "", 1280);
   }
-  return proxyRemoteImage(payload.backdrop_path || payload.info?.cover || "");
+  return proxyRemoteImage(payload.backdrop_path || payload.info?.cover || "", 1280);
 }
 
 function normalizeEpisode(episode: Episode) {
@@ -54,7 +54,7 @@ function normalizeEpisode(episode: Episode) {
       info.overview ||
       info.description ||
       "",
-    movie_image: proxyRemoteImage(episode.movie_image || info.movie_image || "")
+    movie_image: proxyRemoteImage(episode.movie_image || info.movie_image || "", 500)
   };
 }
 

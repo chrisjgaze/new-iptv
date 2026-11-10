@@ -36,7 +36,7 @@ function toTile(item: RecentEntry, index: number): Tile | null {
   if (!title.trim()) return null;
 
   const poster = proxyRemoteImage(item.poster_url || "") || "./assets/fallback.png";
-  const backdrop = proxyRemoteImage(item.backdrop_url || "") || poster;
+  const backdrop = proxyRemoteImage(item.backdrop_url || "", 1280) || poster;
   const watchedPct = Math.max(0, Math.min(100, Number(item.watched_pct || 0)));
   const subtitle = item.media_type === "series"
     ? item.subtitle

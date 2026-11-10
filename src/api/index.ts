@@ -1,4 +1,5 @@
 import API_KEY_V4 from "./key";
+import { backendBase } from "./backend";
 const API_BASE = "https://api.themoviedb.org/3";
 let tmdbConfig;
 let baseImageUrl;
@@ -24,9 +25,17 @@ function normalizeBase(base?: string) {
   return base.endsWith("/") ? base : `${base}/`;
 }
 
-export function proxyRemoteImage(url?: string) {
+// Images go through the Pi's /img cache (image_cache.py), which shrinks each one to the
+// width asked for and keeps it on disk. Posters ~342px, backdrops 1280px.
+// Set VITE_IMAGE_CACHE_URL to point elsewhere, or "off" to load images directly.
+const imageCacheBase = (import.meta.env.VITE_IMAGE_CACHE_URL || `${backendBase}/img`).replace(/\/+$/, "");
+
+export function proxyRemoteImage(url?: string, width = 342) {
   if (!url) return "";
   if (!/^https?:\/\//i.test(url)) return url;
+  if (imageCacheBase !== "off") {
+    return `${imageCacheBase}?w=${width}&u=${encodeURIComponent(url)}`;
+  }
   if (!remoteImageProxyBase) return url;
 
   const proxyBase = remoteImageProxyBase.endsWith("/")

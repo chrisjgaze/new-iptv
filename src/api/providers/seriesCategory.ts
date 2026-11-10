@@ -24,9 +24,9 @@ function normalizeSeries(payload: unknown): RawSeries[] {
 
 function backdropFor(item: RawSeries) {
   if (Array.isArray(item.backdrop_path)) {
-    return proxyRemoteImage(item.backdrop_path[0] || item.cover || "");
+    return proxyRemoteImage(item.backdrop_path[0] || item.cover || "", 1280);
   }
-  return proxyRemoteImage(item.backdrop_path || item.cover || "");
+  return proxyRemoteImage(item.backdrop_path || item.cover || "", 1280);
 }
 
 export default function seriesCategoryProvider(categoryId: string) {
