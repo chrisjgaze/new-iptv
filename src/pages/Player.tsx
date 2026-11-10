@@ -59,6 +59,7 @@ function writeSubtitlePref(value: string) {
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
 
 const SUBTITLE_LINE_HEIGHT = 56;
+const MINI_BAR_WIDTH = 200;
 // Rough line count for sizing the subtitle band: explicit breaks plus wrapping at ~58 characters.
 function subtitleLineCount(text: string) {
   return text
@@ -96,6 +97,9 @@ const Player = () => {
   >([]);
   const [subtitlePos, setSubtitlePos] = createSignal(-1); // position in subtitleTracks, -1 = off
   const [subtitleLine, setSubtitleLine] = createSignal("");
+  // Always-on mini progress bar (bottom right). Stored in whole pixels so the screen is only
+  // redrawn when the bar actually grows: about once every 30s for a 2-hour film.
+  const [miniProgressPx, setMiniProgressPx] = createSignal(0);
   let subtitleTracksLoaded = false;
   const streamUser = import.meta.env.VITE_STREAM_USERNAME || "YOUR_USERNAME";
   const streamPass = import.meta.env.VITE_STREAM_PASSWORD || "YOUR_PASSWORD";
@@ -610,6 +614,8 @@ const Player = () => {
     if (!subtitleTracksLoaded && state === "PLAYING") loadSubtitleTracks();
     const timeSec = getCurrentTime?.() || 0;
     setCurrentTimeSec(timeSec);
+    const total = durationSec();
+    setMiniProgressPx(total > 0 ? Math.round(Math.min(1, Math.max(0, timeSec / total)) * MINI_BAR_WIDTH) : 0);
     setDebugTime(formatTime(timeSec));
     setDurationSec(getVideoDuration?.() || 0);
     const bufInfo = getBufferingInfo?.();
@@ -683,6 +689,11 @@ const Player = () => {
           >
             LOADING {spinnerFrame()}
           </Text>
+        </View>
+      )}
+      {!controlsVisible() && durationSec() > 0 && (
+        <View x={1920 - 60 - MINI_BAR_WIDTH} y={1080 - 40} width={MINI_BAR_WIDTH} height={4} color={0xffffff33}>
+          <View x={0} y={0} width={miniProgressPx()} height={4} color={0xffffffaa} />
         </View>
       )}
       {subtitleLine() && (
