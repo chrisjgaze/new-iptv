@@ -96,7 +96,8 @@ const deviceLogicalPixelRatio = {
   default: window.innerHeight / 1080
 }[screenSize];
 
-const logFps = true;
+// FPS logging costs a little every second on a 2019 TV; enable with ?fps=true when needed.
+const logFps = urlParams.get("fps") === "true";
 Config.debug = false;
 Config.animationsEnabled = animationsEnabled === "true";
 Config.simpleAnimationsEnabled = true;

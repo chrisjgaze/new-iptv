@@ -122,21 +122,24 @@ const Browse = (props) => {
     return createInfiniteScroll(props.data());
   });
 
+  const settledSelection = debounce((item: any) => applySelection(item, false), 350);
+  onCleanup(() => settledSelection.clear());
+
   const delayedBackgrounds = debounce((img: string | number) => {
     if (bgDebug) {
       setBgDebugLine(`bg=item.backdrop ${img}`);
     }
     setGlobalBackground(img);
-  }, 800);
+  }, 450);
   const delayedTmdbBackgrounds = debounce((img: string) => {
     if (bgDebug) {
       setBgDebugLine(`bg=tmdb ${img}`);
     }
     setGlobalBackground(img);
-  }, 800);
+  }, 450);
   const delayedHero = debounce(
     (content: {}) => setHeroContent(content || {}),
-    600
+    150
   );
 
   function setBackgroundDirect(img: string | number, source: string) {
@@ -360,7 +363,9 @@ const Browse = (props) => {
       // preload(item.href, { preloadData: true });
     }
 
-    applySelection(item, false);
+    // Wait until focus rests before fetching plot/backdrop: scrolling along a row used to
+    // fire a TMDB request, a plot request and a full-size backdrop load for every tile passed.
+    settledSelection(item);
   }
 
   function onEndReached(this: ElementNode) {
