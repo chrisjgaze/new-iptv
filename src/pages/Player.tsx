@@ -37,9 +37,10 @@ import {
   getSubtitleText
 } from "../video";
 
-// Remote keys that cycle subtitles: Red/Green/Yellow/Blue colour keys, the CC/Caption key,
-// and "c" on a computer keyboard for browser testing.
-const SUBTITLE_KEYCODES = new Set([403, 404, 405, 406, 10221]);
+// Remote keys: Yellow (405) or CC/Caption (10221) cycle subtitles; Red (403) shows/hides the
+// technical info. "c" and "d" do the same on a computer keyboard for browser testing.
+const SUBTITLE_KEYCODES = new Set([405, 10221]);
+const DEBUG_KEYCODES = new Set([403]);
 const SUBTITLE_PREF_KEY = "cjgflix.subtitleLanguage"; // "off" or a language code / track label
 
 function readSubtitlePref(): string {
@@ -60,6 +61,26 @@ import { useLocation, useNavigate, useParams } from "@solidjs/router";
 
 const SUBTITLE_LINE_HEIGHT = 56;
 const MINI_BAR_WIDTH = 200;
+// Controls bar layout (1920x1080)
+const BAR_X = 80;
+const BAR_W = 1760;
+const BAR_H = 222;
+const BAR_Y = 1080 - BAR_H - 40;
+const TRACK_X = 170;
+const TRACK_W = BAR_W - TRACK_X - 190;
+
+// Hide login details that appear inside stream URLs: /movie/<user>/<pass>/123.mp4
+function maskUrl(text: string) {
+  return String(text || "").replace(
+    /\/(movie|series|live)\/[^/\s]+\/[^/\s]+\//g,
+    "/$1/***/***/"
+  );
+}
+// One short line for the controls bar; the full message is in the red-button panel.
+function shortError(text: string) {
+  const t = maskUrl(text).replace(/^\S+T\S+Z\s+/, ""); // drop the ISO timestamp
+  return t.length > 110 ? t.slice(0, 107) + "..." : t;
+}
 // Rough line count for sizing the subtitle band: explicit breaks plus wrapping at ~58 characters.
 function subtitleLineCount(text: string) {
   return text
@@ -100,6 +121,21 @@ const Player = () => {
   // Always-on mini progress bar (bottom right). Stored in whole pixels so the screen is only
   // redrawn when the bar actually grows: about once every 30s for a 2-hour film.
   const [miniProgressPx, setMiniProgressPx] = createSignal(0);
+  const [streamTitle, setStreamTitle] = createSignal("");
+  const [streamSubtitle, setStreamSubtitle] = createSignal("");
+  const [showDebug, setShowDebug] = createSignal(false); // red button
+
+  const progressPx = () =>
+    durationSec() > 0
+      ? Math.round(Math.max(0, Math.min(1, currentTimeSec() / durationSec())) * TRACK_W)
+      : 0;
+  const statusChips = () => {
+    const subs = subtitleTracks().length
+      ? `Subtitles: ${subtitlePos() >= 0 ? subtitleName(subtitlePos()) : "Off"}`
+      : "No subtitles";
+    const vol = isMuted() ? "Muted" : `Volume ${volumePercent()}%`;
+    return `${subs}    ${vol}`;
+  };
   let subtitleTracksLoaded = false;
   const streamUser = import.meta.env.VITE_STREAM_USERNAME || "YOUR_USERNAME";
   const streamPass = import.meta.env.VITE_STREAM_PASSWORD || "YOUR_PASSWORD";
@@ -430,6 +466,11 @@ const Player = () => {
     if (!event.repeat && (SUBTITLE_KEYCODES.has(event.keyCode) || event.key === "c")) {
       return cycleSubtitles();
     }
+    if (!event.repeat && (DEBUG_KEYCODES.has(event.keyCode) || event.key === "d")) {
+      setShowDebug(!showDebug());
+      revealControls();
+      return true;
+    }
     return handleNumericSeek(event);
   }
 
@@ -489,6 +530,8 @@ const Player = () => {
     }
 
     hasAppliedInitialSeek = false;
+    setStreamTitle(stream.title);
+    setStreamSubtitle(stream.subtitle);
     subtitleTracksLoaded = false;
     setSubtitleTracks([]);
     setSubtitlePos(-1);
@@ -665,7 +708,6 @@ const Player = () => {
     }
   });
 
-  const progressWidth = 1240;
 
   return (
     <View
@@ -700,7 +742,7 @@ const Player = () => {
         <View
           x={160}
           y={
-            (controlsVisible() ? 846 : 1020) -
+            (controlsVisible() ? BAR_Y - 14 : 1020) -
             subtitleLineCount(subtitleLine()) * SUBTITLE_LINE_HEIGHT -
             24
           }
@@ -723,100 +765,94 @@ const Player = () => {
         </View>
       )}
       {controlsVisible() && (
-        <View x={80} y={860} width={1760} height={170} color={0x101820e6}>
-          <Text x={40} y={24} fontSize={32} fontWeight="bold">
-            {debugState() === "PAUSED" ? "Paused" : "Playing"}
+        <View x={BAR_X} y={BAR_Y} width={BAR_W} height={BAR_H} color={0x0b0f16e8} borderRadius={28}>
+          {/* Row 1: title (bold) + episode / subtitle line; status chips on the right */}
+          <Text x={48} y={26} width={1080} contain="width" maxLines={1} fontSize={38} fontWeight="bold">
+            {streamTitle() || "Now playing"}
           </Text>
-          <Text x={250} y={10} fontSize={22}>
-            {`OK ${debugState() === "PAUSED" ? "play" : "pause"}   Left/Right seek ${SEEK_STEP_SECONDS}s   Up/Down volume ${volumePercent()}%${isMuted() ? " muted" : ""}`}
-          </Text>
-          <Text x={250} y={40} fontSize={22}>
-            {`Subtitles (yellow/CC): ${
-              subtitleTracks().length
-                ? `${subtitleName(subtitlePos())} - ${subtitleTracks().length} available`
-                : "none in this file"
-            }   Backend ${debugBackend()}`}
-          </Text>
-          {pendingSeekMinutes() && (
-            <Text x={860} y={28} fontSize={22}>
-              {`Jump to ${pendingSeekMinutes()} min`}
+          {streamSubtitle() && (
+            <Text x={48} y={74} width={1080} contain="width" maxLines={1} fontSize={24} color={0xffffffb3}>
+              {streamSubtitle()}
             </Text>
           )}
-          {seekNotice() && (
-            <Text x={860} y={54} fontSize={20}>
-              {seekNotice()}
-            </Text>
-          )}
-          <Text x={40} y={74} fontSize={24}>
-            {debugTime()}
+          <Text
+            x={BAR_W - 48 - 560}
+            y={32}
+            width={560}
+            contain="width"
+            textAlign="right"
+            fontSize={22}
+            color={0xffffffb3}
+          >
+            {statusChips()}
           </Text>
-          <Text x={1600} y={74} fontSize={24}>
-            {formatTime(durationSec())}
-          </Text>
-          <View x={40} y={118} width={progressWidth} height={12} color={0x49515cff}>
-            <View
-              width={Math.max(
-                0,
-                Math.min(
-                  progressWidth,
-                  durationSec()
-                    ? Math.round((currentTimeSec() / durationSec()) * progressWidth)
-                    : 0
-                )
-              )}
-              height={12}
-              color={0xf0cb00ff}
-            />
-          </View>
-          <View
-            x={
-              40 +
-              Math.max(
-                0,
-                Math.min(
-                  progressWidth - 10,
-                  durationSec()
-                    ? Math.round((currentTimeSec() / durationSec()) * progressWidth) - 5
-                    : 0
-                )
-              )
-            }
-            y={110}
-            width={20}
-            height={28}
-            color={0xffffffff}
-          />
-          <Text x={40} y={142} fontSize={20}>
-            {`Buffering: ${debugBuffering()}  Preparing: ${debugPreparing()}  Last buffer: ${debugLastBufferMs()} ms`}
-          </Text>
-          <Text x={860} y={142} fontSize={20}>
-            {lastKey()}
-          </Text>
-        </View>
-      )}
-      {controlsVisible() && (
-        <>
-          <View x={40} y={40} width={1840} height={96} color={0x00000000}>
-            <Text fontSize={24}>
-              {`State: ${debugState()}  URL: ${debugUrl()}`}
-            </Text>
-          </View>
-          {debugError() && (
-            <View x={40} y={120} width={1840} height={120} color={0x5a0000dd}>
-              <Text x={20} y={20} width={1800} fontSize={22} contain="width">
-                {`Error: ${debugError()}`}
+          {debugState() === "PAUSED" && (
+            <View x={BAR_W - 48 - 130} y={66} width={130} height={36} borderRadius={18} color={0xf0cb00ff}>
+              <Text x={0} y={6} width={130} contain="width" textAlign="center" fontSize={20} fontWeight="bold" color={0x000000ff}>
+                PAUSED
               </Text>
             </View>
           )}
-          <View x={40} y={250} width={900} height={150} color={0x00000088}>
-            <Text x={20} y={16} fontSize={22}>
-              AVPlay events
-            </Text>
-            <Text x={20} y={48} width={860} fontSize={18} contain="width">
-              {debugEvents().join(" | ")}
-            </Text>
+
+          {/* Row 2: time, rounded progress track with a round knob, duration */}
+          <Text x={48} y={126} fontSize={24}>
+            {debugTime()}
+          </Text>
+          <View x={TRACK_X} y={137} width={TRACK_W} height={8} borderRadius={4} color={0xffffff33}>
+            <View width={progressPx()} height={8} borderRadius={4} color={0xf0cb00ff} />
           </View>
-        </>
+          <View x={TRACK_X + progressPx() - 10} y={131} width={20} height={20} borderRadius={10} color={0xffffffff} />
+          <Text x={BAR_W - 48 - 120} y={126} width={120} contain="width" textAlign="right" fontSize={24}>
+            {formatTime(durationSec())}
+          </Text>
+
+          {/* Row 3: quiet key hints on the left; notices (or a short error) on the right */}
+          {debugError() ? (
+            <Text x={48} y={176} width={BAR_W - 96} contain="width" maxLines={1} fontSize={20} color={0xff7b72ff}>
+              {`Can't play: ${shortError(debugError())}   (red button: details)`}
+            </Text>
+          ) : (
+            <Text x={48} y={178} fontSize={19} color={0xffffff73}>
+              {`OK ${debugState() === "PAUSED" ? "play" : "pause"}  ·  Left/Right ${SEEK_STEP_SECONDS}s  ·  Up/Down volume  ·  0-9 jump to minute  ·  Yellow subtitles  ·  Red info`}
+            </Text>
+          )}
+          {(pendingSeekMinutes() || seekNotice()) && !debugError() && (
+            <Text
+              x={BAR_W - 48 - 520}
+              y={176}
+              width={520}
+              contain="width"
+              textAlign="right"
+              fontSize={21}
+              fontWeight="bold"
+              color={0xf0cb00ff}
+            >
+              {pendingSeekMinutes() ? `Jump to ${pendingSeekMinutes()} min` : seekNotice()}
+            </Text>
+          )}
+        </View>
+      )}
+      {/* Red button: technical details, hidden by default */}
+      {showDebug() && (
+        <View x={40} y={40} width={1840} height={360} color={0x000000c8} borderRadius={20}>
+          <Text x={28} y={20} fontSize={22} fontWeight="bold" color={0xf0cb00ff}>
+            Technical info (red button to hide)
+          </Text>
+          <Text x={28} y={56} width={1784} contain="width" maxLines={2} fontSize={19}>
+            {`State ${debugState()}  ·  Backend ${debugBackend()}  ·  Buffering ${debugBuffering()}  ·  Preparing ${debugPreparing()}  ·  Last buffer ${debugLastBufferMs()} ms  ·  ${lastKey()}`}
+          </Text>
+          <Text x={28} y={110} width={1784} contain="width" maxLines={2} fontSize={18} color={0xffffffb3}>
+            {`URL ${maskUrl(debugUrl())}`}
+          </Text>
+          {debugError() && (
+            <Text x={28} y={162} width={1784} contain="width" maxLines={3} fontSize={19} color={0xff7b72ff}>
+              {`Error: ${maskUrl(debugError())}`}
+            </Text>
+          )}
+          <Text x={28} y={250} width={1784} contain="width" maxLines={4} fontSize={17} color={0xffffffb3}>
+            {`Player events: ${debugEvents().join("  |  ")}`}
+          </Text>
+        </View>
       )}
     </View>
   );

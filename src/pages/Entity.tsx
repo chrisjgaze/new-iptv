@@ -100,6 +100,13 @@ const Entity = (props) => {
       media_id: streamId(),
       tmdbId: params.id && params.id !== "0" ? params.id : "",
       title: data.heroContent?.title || data.title || "",
+      // Shown under the title in the player bar, e.g. "2026 · 2h 52m"
+      subtitle: [
+        String(data.release_date || "").slice(0, 4),
+        data.runtime ? `${Math.floor(data.runtime / 60)}h ${String(data.runtime % 60).padStart(2, "0")}m` : ""
+      ]
+        .filter(Boolean)
+        .join(" · "),
       overview: data.heroContent?.description || data.overview || "",
       posterUrl: data.poster_path ? getImageUrl(data.poster_path) : getQueryParam("poster") || "",
       backdropUrl: data.backgroundImage || "",
