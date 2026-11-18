@@ -61,9 +61,10 @@ import { useLocation, useNavigate, useParams } from "@solidjs/router";
 
 const SUBTITLE_LINE_HEIGHT = 56;
 const MINI_BAR_WIDTH = 200;
-// Series: show the "Next episode" card from 95% through, start the next episode at 98%.
-const NEXT_CARD_AT = 0.95;
-const NEXT_AUTOPLAY_AT = 0.98;
+// Series: start the next episode when 60 seconds of this one remain (skipping end credits);
+// the "Next episode" card appears 30 seconds before that with a countdown.
+const NEXT_AUTOPLAY_REMAINING_S = 60;
+const NEXT_CARD_LEAD_S = 30;
 
 type NextEpisode = { id: string; ext: string; label: string; title: string };
 
@@ -156,7 +157,6 @@ const Player = () => {
   const [nextCountdown, setNextCountdown] = createSignal(0);
   let nextDismissed = false;
   let advancing = false;
-  let lastProgress = 0;
 
   const progressPx = () =>
     durationSec() > 0
@@ -512,12 +512,13 @@ const Player = () => {
     if (!next || nextDismissed || advancing || exiting) return;
     const playing = state === "PLAYING" || state === "PAUSED" || state === "READY";
     if (playing && total > 0) {
-      const pct = timeSec / total;
-      lastProgress = pct;
-      setNextCardVisible(pct >= NEXT_CARD_AT);
-      setNextCountdown(Math.max(0, Math.ceil(total * NEXT_AUTOPLAY_AT - timeSec)));
-      if (pct >= NEXT_AUTOPLAY_AT && state === "PLAYING") playNextEpisode();
-    } else if (lastProgress >= NEXT_CARD_AT && (state === "NONE" || state === "IDLE")) {
+      // Very short files: never start more than 10% before the end.
+      const autoplayRemaining = Math.min(NEXT_AUTOPLAY_REMAINING_S, total * 0.1);
+      const untilAutoplay = total - autoplayRemaining - timeSec;
+      setNextCardVisible(untilAutoplay <= NEXT_CARD_LEAD_S);
+      setNextCountdown(Math.max(0, Math.ceil(untilAutoplay)));
+      if (untilAutoplay <= 0 && state === "PLAYING") playNextEpisode();
+    } else if (nextCardVisible() && (state === "NONE" || state === "IDLE")) {
       // The file ended before 98% was reached (short final segment): carry on anyway.
       playNextEpisode();
     }
@@ -623,7 +624,6 @@ const Player = () => {
     setNextCardVisible(false);
     nextDismissed = false;
     advancing = false;
-    lastProgress = 0;
     if (stream.streamType === "series" && stream.mediaType === "series" && stream.mediaId) {
       const forId = stream.streamId;
       findNextEpisode(stream.mediaId, forId)
