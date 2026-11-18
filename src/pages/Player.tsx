@@ -10,7 +10,7 @@ import { setGlobalBackground } from "../state";
 import {
   updateWatchProgress
 } from "../api/providers/watchProgress";
-import { getPendingPlayerMetadata } from "../utils/playerMetadata";
+import { getPendingPlayerMetadata, setPendingPlayerMetadata } from "../utils/playerMetadata";
 import { getProviderUrl } from "../api/backend";
 import {
   init,
@@ -61,6 +61,33 @@ import { useLocation, useNavigate, useParams } from "@solidjs/router";
 
 const SUBTITLE_LINE_HEIGHT = 56;
 const MINI_BAR_WIDTH = 200;
+// Series: show the "Next episode" card from 95% through, start the next episode at 98%.
+const NEXT_CARD_AT = 0.95;
+const NEXT_AUTOPLAY_AT = 0.98;
+
+type NextEpisode = { id: string; ext: string; label: string; title: string };
+
+/** The episode after `episodeId` in the series: next in the season, else the next season's first. */
+async function findNextEpisode(seriesId: string, episodeId: string): Promise<NextEpisode | null> {
+  const { getSeriesInfo } = await import("../api/providers/seriesInfo");
+  const info: any = await getSeriesInfo(seriesId);
+  const ordered: { season: string; ep: any }[] = [];
+  for (const season of info.seasonKeys || []) {
+    const eps = [...(info.episodes?.[season] || [])].sort(
+      (a, b) => (Number(a.episode_num) || 0) - (Number(b.episode_num) || 0)
+    );
+    eps.forEach((ep) => ordered.push({ season, ep }));
+  }
+  const index = ordered.findIndex((e) => String(e.ep.id) === String(episodeId));
+  const next = index >= 0 ? ordered[index + 1] : undefined;
+  if (!next || !next.ep.id) return null;
+  return {
+    id: String(next.ep.id),
+    ext: next.ep.container_extension || "mp4",
+    label: `S${next.season} E${next.ep.episode_num ?? ""}`.trim(),
+    title: next.ep.title || ""
+  };
+}
 // Controls bar layout (1920x1080)
 const BAR_X = 80;
 const BAR_W = 1760;
@@ -124,6 +151,12 @@ const Player = () => {
   const [streamTitle, setStreamTitle] = createSignal("");
   const [streamSubtitle, setStreamSubtitle] = createSignal("");
   const [showDebug, setShowDebug] = createSignal(false); // red button
+  const [nextEpisode, setNextEpisode] = createSignal<NextEpisode | null>(null);
+  const [nextCardVisible, setNextCardVisible] = createSignal(false);
+  const [nextCountdown, setNextCountdown] = createSignal(0);
+  let nextDismissed = false;
+  let advancing = false;
+  let lastProgress = 0;
 
   const progressPx = () =>
     durationSec() > 0
@@ -474,6 +507,59 @@ const Player = () => {
     return handleNumericSeek(event);
   }
 
+  function updateNextEpisode(state: string, timeSec: number, total: number) {
+    const next = nextEpisode();
+    if (!next || nextDismissed || advancing || exiting) return;
+    const playing = state === "PLAYING" || state === "PAUSED" || state === "READY";
+    if (playing && total > 0) {
+      const pct = timeSec / total;
+      lastProgress = pct;
+      setNextCardVisible(pct >= NEXT_CARD_AT);
+      setNextCountdown(Math.max(0, Math.ceil(total * NEXT_AUTOPLAY_AT - timeSec)));
+      if (pct >= NEXT_AUTOPLAY_AT && state === "PLAYING") playNextEpisode();
+    } else if (lastProgress >= NEXT_CARD_AT && (state === "NONE" || state === "IDLE")) {
+      // The file ended before 98% was reached (short final segment): carry on anyway.
+      playNextEpisode();
+    }
+  }
+
+  function playNextEpisode() {
+    const next = nextEpisode();
+    if (!next || advancing) return true;
+    advancing = true;
+    setNextCardVisible(false);
+    void saveWatchProgress();
+    const current = getCurrentStream();
+    setPendingPlayerMetadata(next.id, {
+      mediaType: "series",
+      mediaId: current.mediaId,
+      title: current.title,
+      subtitle: [next.label, next.title].filter(Boolean).join(" · "),
+      overview: current.overview,
+      posterUrl: current.posterUrl,
+      backdropUrl: current.backdropUrl,
+      containerExtension: next.ext
+    });
+    // replace: Back from the next episode returns to the series page, not to this episode.
+    navigate(`/player/${next.id}?ext=${next.ext}&type=series&seek_time=0`, { replace: true });
+    return true;
+  }
+
+  function handleEnter() {
+    if (nextCardVisible()) return playNextEpisode();
+    return togglePlayPause();
+  }
+
+  function handleBack() {
+    if (nextCardVisible()) {
+      // First Back hides the card and cancels the automatic start; Back again leaves.
+      nextDismissed = true;
+      setNextCardVisible(false);
+      return true;
+    }
+    return exitPlayer();
+  }
+
   let exiting = false;
   function exitPlayer() {
     if (exiting) return true;
@@ -532,6 +618,20 @@ const Player = () => {
     hasAppliedInitialSeek = false;
     setStreamTitle(stream.title);
     setStreamSubtitle(stream.subtitle);
+    // Next episode (series only): look it up in the background, ignore if the film changed meanwhile.
+    setNextEpisode(null);
+    setNextCardVisible(false);
+    nextDismissed = false;
+    advancing = false;
+    lastProgress = 0;
+    if (stream.streamType === "series" && stream.mediaType === "series" && stream.mediaId) {
+      const forId = stream.streamId;
+      findNextEpisode(stream.mediaId, forId)
+        .then((next) => {
+          if (params.id === forId) setNextEpisode(next);
+        })
+        .catch((e) => console.warn("Next episode lookup failed", e));
+    }
     subtitleTracksLoaded = false;
     setSubtitleTracks([]);
     setSubtitlePos(-1);
@@ -659,6 +759,7 @@ const Player = () => {
     setCurrentTimeSec(timeSec);
     const total = durationSec();
     setMiniProgressPx(total > 0 ? Math.round(Math.min(1, Math.max(0, timeSec / total)) * MINI_BAR_WIDTH) : 0);
+    updateNextEpisode(state || "", timeSec, total);
     setDebugTime(formatTime(timeSec));
     setDurationSec(getVideoDuration?.() || 0);
     const bufInfo = getBufferingInfo?.();
@@ -712,8 +813,8 @@ const Player = () => {
   return (
     <View
       autofocus
-      onBack={exitPlayer}
-      onEnter={togglePlayPause}
+      onBack={handleBack}
+      onEnter={handleEnter}
       onUp={() => adjustPlayerVolume(0.1) || (revealControls(), true)}
       onDown={() => adjustPlayerVolume(-0.1) || (revealControls(), true)}
       onLeft={() => seekBy(-SEEK_STEP_SECONDS)}
@@ -736,6 +837,26 @@ const Player = () => {
       {!controlsVisible() && durationSec() > 0 && (
         <View x={1920 - 60 - MINI_BAR_WIDTH} y={1080 - 40} width={MINI_BAR_WIDTH} height={4} color={0xffffff33}>
           <View x={0} y={0} width={miniProgressPx()} height={4} color={0xffffffaa} />
+        </View>
+      )}
+      {nextCardVisible() && nextEpisode() && (
+        <View
+          x={1920 - 60 - 600}
+          y={controlsVisible() ? BAR_Y - 190 : 1080 - 60 - 170}
+          width={600}
+          height={170}
+          borderRadius={24}
+          color={0x0b0f16f0}
+        >
+          <Text x={32} y={24} fontSize={20} fontWeight="bold" color={0xf0cb00ff}>
+            NEXT EPISODE
+          </Text>
+          <Text x={32} y={56} width={536} contain="width" maxLines={1} fontSize={30} fontWeight="bold">
+            {`${nextEpisode()!.label}${nextEpisode()!.title ? ` · ${nextEpisode()!.title}` : ""}`}
+          </Text>
+          <Text x={32} y={110} width={536} contain="width" maxLines={1} fontSize={21} color={0xffffffb3}>
+            {`${nextCountdown() > 0 ? `Starts in ${nextCountdown()}s` : "Starting..."}   ·   OK play now   ·   Back cancel`}
+          </Text>
         </View>
       )}
       {subtitleLine() && (
